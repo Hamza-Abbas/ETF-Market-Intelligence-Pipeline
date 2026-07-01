@@ -1,0 +1,13 @@
+symbols:
+  - VOO
+  - SPY
+  - QQQ
+  - VGT
+  - VT
+  - VXUS
+  - BND
+  - GLD
+
+source:
+  name: yahoo_finance
+  start_date: "2015-01-01"

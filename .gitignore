@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+
+.env
+
+data/bronze/
+data/silver/
+data/gold/
+
+logs/
+.ipynb_checkpoints/
+
+target/
+dbt_packages/
+profiles.yml
