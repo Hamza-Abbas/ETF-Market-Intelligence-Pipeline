@@ -14,3 +14,6 @@ logs/
 target/
 dbt_packages/
 profiles.yml
+
+etf_intelligence_pipeline/target/
+etf_intelligence_pipeline/dbt_packages/

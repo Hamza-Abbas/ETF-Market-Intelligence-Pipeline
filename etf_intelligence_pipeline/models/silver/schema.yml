@@ -1,0 +1,103 @@
+version: 2
+
+models:
+  - name: etf_prices_cleaned
+    description: "Cleaned daily ETF price data with standardized columns, trading day sequence, daily returns, and 5-trading-day returns."
+
+    columns:
+      - name: symbol
+        description: "ETF ticker symbol."
+        tests:
+            - not_null
+            - accepted_values:
+                arguments:
+                    values: ['VOO', 'SPY', 'QQQ', 'VGT', 'VT', 'VXUS', 'BND', 'GLD']
+
+      - name: trading_day_number
+        description: "Sequential trading day number for each ETF symbol ordered by price_date."
+        tests:
+          - not_null
+
+      - name: price_date
+        description: "Trading date for the ETF price record."
+        tests:
+          - not_null
+
+      - name: opening_price
+        description: "Opening price of the ETF on the trading date."
+        tests:
+          - not_null
+
+      - name: high_price
+        description: "Highest ETF price during the trading date."
+        tests:
+          - not_null
+
+      - name: low_price
+        description: "Lowest ETF price during the trading date."
+        tests:
+          - not_null
+
+      - name: closing_price
+        description: "Closing ETF price on the trading date."
+        tests:
+          - not_null
+
+      - name: adjusted_closing_price
+        description: "Adjusted closing price used for return calculations."
+        tests:
+          - not_null
+
+      - name: previous_adjusted_closing_price
+        description: "Previous trading day's adjusted closing price for the same ETF symbol."
+
+      - name: adjusted_close_5d_ago
+        description: "Adjusted closing price from five trading records before the current row."
+
+      - name: daily_return
+        description: "Daily return in decimal form, calculated using adjusted closing price."
+
+      - name: daily_return_pct
+        description: "Daily return expressed as a percentage."
+
+      - name: return_5d
+        description: "Five-trading-day return in decimal form."
+
+      - name: return_5d_pct
+        description: "Five-trading-day return expressed as a percentage."
+
+      - name: volume
+        description: "Trading volume for the ETF on the trading date."
+        tests:
+          - not_null
+
+      - name: source_provider
+        description: "Source system or provider of the data."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['yahoo_finance']
+
+      - name: data_loaded_as
+        description: "Indicates whether the record came from historical or incremental ingestion."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['historical']
+
+      - name: batch_id
+        description: "Unique ingestion batch identifier."
+        tests:
+          - not_null
+
+      - name: ingested_at_utc
+        description: "Timestamp when the record was ingested into the local Bronze layer."
+        tests:
+          - not_null
+
+      - name: silver_created_at_utc
+        description: "Timestamp when the Silver model created the record."
+        tests:
+          - not_null

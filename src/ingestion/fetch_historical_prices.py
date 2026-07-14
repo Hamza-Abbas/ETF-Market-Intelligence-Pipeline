@@ -101,14 +101,7 @@ def fetch_symbol_history(symbol: str, start_date: str, batch_id: str) -> pd.Data
 
 
 def save_to_bronze(df: pd.DataFrame, symbol: str) -> None:
-    """
-    Save ETF data to the local Bronze layer as CSV.
 
-    Bronze rule:
-    - Keep the data close to source format.
-    - Add ingestion metadata.
-    - Do not calculate business metrics here.
-    """
     output_dir = BRONZE_DIR / f"symbol={symbol}" / "load_type=historical"
     output_dir.mkdir(parents=True, exist_ok=True)
 
