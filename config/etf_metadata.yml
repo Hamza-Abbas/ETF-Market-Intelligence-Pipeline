@@ -46,3 +46,75 @@ etfs:
     asset_class: Commodity
     region: Global
     category: Gold
+
+  - symbol: VEA
+    name: Vanguard FTSE Developed Markets ETF
+    asset_class: Equity
+    region: Developed markets excluding US
+    category: Developed international equity
+
+  - symbol: VWO
+    name: Vanguard FTSE Emerging Markets ETF
+    asset_class: Equity
+    region: Emerging markets
+    category: Emerging markets equity
+
+  - symbol: BNDX
+    name: Vanguard Total International Bond ETF
+    asset_class: Bond
+    region: International excluding US
+    category: International bond market
+
+  - symbol: ACWI
+    name: iShares MSCI ACWI ETF
+    asset_class: Equity
+    region: Global
+    category: Global developed and emerging equity
+
+  - symbol: EFA
+    name: iShares MSCI EAFE ETF
+    asset_class: Equity
+    region: Developed markets excluding US and Canada
+    category: Developed international equity
+
+  - symbol: IEMG
+    name: iShares Core MSCI Emerging Markets ETF
+    asset_class: Equity
+    region: Emerging markets
+    category: Emerging markets equity
+
+  - symbol: EWJ
+    name: iShares MSCI Japan ETF
+    asset_class: Equity
+    region: Japan
+    category: Country equity
+
+  - symbol: MCHI
+    name: iShares MSCI China ETF
+    asset_class: Equity
+    region: China
+    category: Country equity
+
+  - symbol: INDA
+    name: iShares MSCI India ETF
+    asset_class: Equity
+    region: India
+    category: Country equity
+
+  - symbol: EWG
+    name: iShares MSCI Germany ETF
+    asset_class: Equity
+    region: Germany
+    category: Country equity
+
+  - symbol: EWU
+    name: iShares MSCI United Kingdom ETF
+    asset_class: Equity
+    region: United Kingdom
+    category: Country equity
+
+  - symbol: EWZ
+    name: iShares MSCI Brazil ETF
+    asset_class: Equity
+    region: Brazil
+    category: Country equity
