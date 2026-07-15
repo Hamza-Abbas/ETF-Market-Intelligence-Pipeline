@@ -138,4 +138,28 @@ dbt Silver model
     ↓
 dbt Gold marts
 ```
+---
 
+## Bronze Layer
+
+The Bronze layer contains raw ETF price data fetched from Yahoo Finance.
+
+The local Bronze files are saved as CSV files under:
+
+```text
+data/bronze/yahoo_finance/
+```
+
+A combined CSV file is created for dbt seed loading:
+
+```text
+data/bronze/yahoo_finance_upload/etf_prices_historical.csv
+```
+
+In Databricks, the Bronze table is:
+
+```text
+bronze.etf_prices_raw
+```
+
+---
