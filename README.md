@@ -163,3 +163,30 @@ bronze.etf_prices_raw
 ```
 
 ---
+
+## Silver Layer
+
+The Silver layer cleans and standardizes the raw ETF price data.
+
+Main Silver model:
+
+```text
+silver.etf_prices_cleaned
+```
+
+Silver layer work includes:
+
+- Renaming columns
+- Filtering invalid rows
+- Keeping required price fields
+- Calculating previous adjusted closing price
+- Calculating daily return
+- Calculating daily return percentage
+
+The Silver table keeps this grain:
+
+```text
+one row per ETF per trading day
+```
+
+---
