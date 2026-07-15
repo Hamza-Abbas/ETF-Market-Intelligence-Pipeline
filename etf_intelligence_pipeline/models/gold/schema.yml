@@ -1,0 +1,294 @@
+version: 2
+
+models:
+  - name: etf_long_term_performance
+    description: "Compares each ETF's total return from its first available trading date to its latest available trading date."
+
+    columns:
+      - name: symbol
+        description: "ETF ticker symbol."
+        tests:
+          - not_null
+          - unique
+
+      - name: start_date
+        description: "First available trading date for the ETF."
+        tests:
+          - not_null
+
+      - name: first_adjusted_closing_price
+        description: "Adjusted closing price on the first available trading date."
+        tests:
+          - not_null
+
+      - name: end_date
+        description: "Latest available trading date for the ETF."
+        tests:
+          - not_null
+
+      - name: latest_adjusted_closing_price
+        description: "Adjusted closing price on the latest available trading date."
+        tests:
+          - not_null
+
+      - name: total_return
+        description: "Absolute price difference between latest adjusted close and first adjusted close."
+        tests:
+          - not_null
+
+      - name: total_return_pct
+        description: "Percentage return from first adjusted close to latest adjusted close."
+        tests:
+          - not_null
+
+      - name: gold_created_at_utc
+        description: "Timestamp when the Gold mart was created or refreshed."
+        tests:
+          - not_null
+
+
+  - name: etf_month_by_month_performance
+    description: "Monthly ETF performance calculated from the first and last available trading day of each month."
+
+    columns:
+      - name: symbol
+        description: "ETF ticker symbol."
+        tests:
+          - not_null
+
+      - name: month_start_date
+        description: "Calendar month bucket for the ETF performance period."
+        tests:
+          - not_null
+
+      - name: first_trading_date_of_month
+        description: "First available trading date for the ETF in that month."
+        tests:
+          - not_null
+
+      - name: last_trading_date_of_month
+        description: "Last available trading date for the ETF in that month."
+        tests:
+          - not_null
+
+      - name: first_adjusted_closing_price
+        description: "Adjusted closing price on the first trading day of the month."
+        tests:
+          - not_null
+
+      - name: last_adjusted_closing_price
+        description: "Adjusted closing price on the last trading day of the month."
+        tests:
+          - not_null
+
+      - name: monthly_return
+        description: "Absolute price difference between the last and first adjusted closing price of the month."
+        tests:
+          - not_null
+
+      - name: monthly_return_pct
+        description: "Percentage return between the first and last adjusted closing price of the month."
+        tests:
+          - not_null
+
+      - name: trading_days_count
+        description: "Number of trading records available for the ETF in that month."
+        tests:
+          - not_null
+
+      - name: gold_created_at_utc
+        description: "Timestamp when the Gold mart was created or refreshed."
+        tests:
+          - not_null
+
+
+  - name: etf_risk_summary
+    description: "Summarizes ETF return and risk behavior using monthly performance metrics."
+
+    columns:
+      - name: symbol
+        description: "ETF ticker symbol."
+        tests:
+          - not_null
+          - unique
+
+      - name: total_months_count
+        description: "Total number of monthly records available for the ETF."
+        tests:
+          - not_null
+
+      - name: positive_months_count
+        description: "Number of months where the ETF had a positive monthly return."
+        tests:
+          - not_null
+
+      - name: negative_months_count
+        description: "Number of months where the ETF had a negative monthly return."
+        tests:
+          - not_null
+
+      - name: flat_months_count
+        description: "Number of months where the ETF had zero monthly return."
+        tests:
+          - not_null
+
+      - name: avg_monthly_return_pct
+        description: "Average monthly return percentage for the ETF."
+        tests:
+          - not_null
+
+      - name: best_monthly_return_pct
+        description: "Best monthly return percentage for the ETF."
+        tests:
+          - not_null
+
+      - name: worst_monthly_return_pct
+        description: "Worst monthly return percentage for the ETF."
+        tests:
+          - not_null
+
+      - name: monthly_volatility_pct
+        description: "Standard deviation of monthly return percentage, used as a simple volatility measure."
+        tests:
+          - not_null
+
+      - name: positive_month_ratio_pct
+        description: "Percentage of months where the ETF had a positive return."
+        tests:
+          - not_null
+
+      - name: return_to_risk_score
+        description: "Simple return-to-risk score calculated as average monthly return divided by monthly volatility."
+        tests:
+          - not_null
+
+      - name: gold_created_at_utc
+        description: "Timestamp when the Gold mart was created or refreshed."
+        tests:
+          - not_null
+
+
+  - name: etf_monthly_market_summary
+    description: "Summarizes monthly performance across the full ETF universe."
+
+    columns:
+      - name: month_start_date
+        description: "Calendar month bucket for the ETF market summary."
+        tests:
+          - not_null
+          - unique
+
+      - name: total_etfs_count
+        description: "Total number of ETFs available in the month."
+        tests:
+          - not_null
+
+      - name: positive_etfs_count
+        description: "Number of ETFs with positive monthly returns in the month."
+        tests:
+          - not_null
+
+      - name: negative_etfs_count
+        description: "Number of ETFs with negative monthly returns in the month."
+        tests:
+          - not_null
+
+      - name: flat_etfs_count
+        description: "Number of ETFs with zero monthly return in the month."
+        tests:
+          - not_null
+
+      - name: avg_monthly_return_pct
+        description: "Average monthly return percentage across all ETFs in the month."
+        tests:
+          - not_null
+
+      - name: best_monthly_return_pct
+        description: "Highest ETF monthly return percentage in the month."
+        tests:
+          - not_null
+
+      - name: worst_monthly_return_pct
+        description: "Lowest ETF monthly return percentage in the month."
+        tests:
+          - not_null
+
+      - name: best_performing_etf
+        description: "ETF symbol with the highest monthly return in the month."
+        tests:
+          - not_null
+
+      - name: best_performing_etf_return_pct
+        description: "Monthly return percentage of the best-performing ETF in the month."
+        tests:
+          - not_null
+
+      - name: worst_performing_etf
+        description: "ETF symbol with the lowest monthly return in the month."
+        tests:
+          - not_null
+
+      - name: worst_performing_etf_return_pct
+        description: "Monthly return percentage of the worst-performing ETF in the month."
+        tests:
+          - not_null
+
+      - name: positive_etf_ratio_pct
+        description: "Percentage of ETFs with positive monthly returns in the month."
+        tests:
+          - not_null
+
+      - name: gold_created_at_utc
+        description: "Timestamp when the Gold mart was created or refreshed."
+        tests:
+          - not_null
+
+
+  - name: etf_alert_candidates
+    description: "Identifies ETF monthly return movements that qualify as alert candidates based on fixed return thresholds."
+
+    columns:
+      - name: symbol
+        description: "ETF ticker symbol."
+        tests:
+          - not_null
+
+      - name: month_start_date
+        description: "Calendar month bucket for the alert candidate."
+        tests:
+          - not_null
+
+      - name: monthly_return_pct
+        description: "Monthly return percentage that triggered the alert candidate rule."
+        tests:
+          - not_null
+
+      - name: alert_type
+        description: "Type of alert signal generated from the monthly return threshold."
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - STRONG_GAIN
+                - SHARP_DROP
+                - POSITIVE_MOMENTUM
+                - NEGATIVE_MOMENTUM
+
+      - name: alert_severity
+        description: "Severity level of the alert candidate."
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - HIGH
+                - MEDIUM
+
+      - name: alert_message
+        description: "Human-readable alert message describing the ETF movement."
+        tests:
+          - not_null
+
+      - name: gold_created_at_utc
+        description: "Timestamp when the Gold mart was created or refreshed."
+        tests:
+          - not_null

@@ -1,0 +1,24 @@
+# ETF symbols used in this project
+#
+# VOO  - Vanguard S&P 500 ETF
+# SPY  - SPDR S&P 500 ETF Trust
+# QQQ  - Invesco QQQ Trust
+# VGT  - Vanguard Information Technology ETF
+# VT   - Vanguard Total World Stock ETF
+# VXUS - Vanguard Total International Stock ETF
+# BND  - Vanguard Total Bond Market ETF
+# GLD  - SPDR Gold Shares
+
+symbols:
+  - VOO
+  - SPY
+  - QQQ
+  - VGT
+  - VT
+  - VXUS
+  - BND
+  - GLD
+
+source:
+  name: yahoo_finance
+  start_date: "2015-01-01"

@@ -1,0 +1,48 @@
+etfs:
+  - symbol: VOO
+    name: Vanguard S&P 500 ETF
+    asset_class: Equity
+    region: US
+    category: Large-cap equity
+
+  - symbol: SPY
+    name: SPDR S&P 500 ETF Trust
+    asset_class: Equity
+    region: US
+    category: Large-cap equity
+
+  - symbol: QQQ
+    name: Invesco QQQ Trust
+    asset_class: Equity
+    region: US
+    category: Technology/growth equity
+
+  - symbol: VGT
+    name: Vanguard Information Technology ETF
+    asset_class: Equity
+    region: US
+    category: Technology sector
+
+  - symbol: VT
+    name: Vanguard Total World Stock ETF
+    asset_class: Equity
+    region: Global
+    category: Global equity
+
+  - symbol: VXUS
+    name: Vanguard Total International Stock ETF
+    asset_class: Equity
+    region: International excluding US
+    category: International equity
+
+  - symbol: BND
+    name: Vanguard Total Bond Market ETF
+    asset_class: Bond
+    region: US
+    category: Total bond market
+
+  - symbol: GLD
+    name: SPDR Gold Shares
+    asset_class: Commodity
+    region: Global
+    category: Gold
