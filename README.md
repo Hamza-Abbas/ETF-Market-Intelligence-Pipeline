@@ -383,3 +383,10 @@ ORDER BY alert_severity, alert_count DESC;
 
 ---
 
+## Current Milestone
+
+The current version of the project has completed the batch pipeline from Yahoo Finance ingestion to Databricks Silver and Gold marts.
+
+The next development phase is building a Streamlit dashboard using the Gold tables.
+
+---
