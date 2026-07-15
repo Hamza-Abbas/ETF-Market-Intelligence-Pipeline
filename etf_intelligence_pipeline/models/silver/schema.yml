@@ -11,7 +11,7 @@ models:
             - not_null
             - accepted_values:
                 arguments:
-                    values: ['VOO', 'SPY', 'QQQ', 'VGT', 'VT', 'VXUS', 'BND', 'GLD']
+                    values: ['VOO', 'SPY', 'QQQ', 'VGT', 'VT', 'VXUS', 'BND', 'GLD','VEA','VWO','BNDX','ACWI','EFA','IEMG','EWJ','MCHI','INDA','EWG','EWU','EWZ']
 
       - name: trading_day_number
         description: "Sequential trading day number for each ETF symbol ordered by price_date."
