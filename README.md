@@ -121,4 +121,21 @@ daily_etf_market_intelligence_pipeline/
 
 ---
 
+## Pipeline Flow
+
+```text
+Yahoo Finance
+    ↓
+Python ingestion scripts
+    ↓
+Local Bronze CSV files
+    ↓
+Combined upload CSV
+    ↓
+dbt seed into Databricks Bronze
+    ↓
+dbt Silver model
+    ↓
+dbt Gold marts
+```
 
