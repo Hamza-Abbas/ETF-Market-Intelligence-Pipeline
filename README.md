@@ -1,6 +1,6 @@
 # ETF Market Intelligence Pipeline
 
-This is a Data Engineering portfolio project that ingests ETF market data, loads it into Databricks, and transforms it through Bronze, Silver, and Gold layers using dbt.
+This is a Data Engineering portfolio project that ingests ETF market data, loads it into Databricks, and transforms it using Bronze, Silver, and Gold layers using dbt.
 
 The project currently focuses on building a reliable batch pipeline for ETF price analytics using the Medallion Architecture.
 
