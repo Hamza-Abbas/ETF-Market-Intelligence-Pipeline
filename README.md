@@ -380,7 +380,6 @@ FROM gold.etf_alert_candidates
 GROUP BY alert_type, alert_severity
 ORDER BY alert_severity, alert_count DESC;
 ```
-
 ---
 
 ## Current Milestone
