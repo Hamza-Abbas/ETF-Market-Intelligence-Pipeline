@@ -81,7 +81,6 @@ ETF metadata is stored in:
 ```text
 config/etf_metadata.yml
 ```
-
 ---
 
 ## Project Structure
