@@ -39,7 +39,7 @@ Next:
 - dbt Core
 - dbt-databricks
 - Medallion Architecture
-- Git / GitHub
+- Git /GitHub
 
 ---
 
