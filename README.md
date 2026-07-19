@@ -2,6 +2,7 @@
 
 > **Project status: In progress**
 >
+> 
 > The historical batch pipeline, Databricks Medallion layers, dbt models/tests, and Streamlit dashboard are working. Daily incremental ingestion, orchestration, alert delivery, and public deployment are still under development.
 
 A Data Engineering portfolio project that collects ETF market data from Yahoo Finance, processes it through Bronze, Silver, and Gold layers in Databricks using dbt, and serves analytics through an interactive Streamlit dashboard.
