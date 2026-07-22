@@ -1,57 +1,44 @@
 version: 2
 
 seeds:
-  - name: etf_prices_raw
-    description: "Raw historical ETF price data loaded from Yahoo Finance using dbt seed."
+  - name: etf_prices_incremental
+    description: "Temporary landing batch containing the newest daily ETF prices."
+
     columns:
       - name: symbol
-        description: "ETF ticker symbol."
-        tests:
+        data_tests:
           - not_null
 
       - name: price_date
-        description: "Trading date for the ETF price record."
-        tests:
-          - not_null
-
-      - name: open
-        description: "Opening price."
-        tests:
-          - not_null
-
-      - name: high
-        description: "Highest price during the trading day."
-        tests:
-          - not_null
-
-      - name: low
-        description: "Lowest price during the trading day."
-        tests:
-          - not_null
-
-      - name: close
-        description: "Closing price."
-        tests:
+        data_tests:
           - not_null
 
       - name: adjusted_close
-        description: "Adjusted closing price."
-        tests:
+        data_tests:
           - not_null
 
       - name: volume
-        description: "Trading volume."
-        tests:
+        data_tests:
           - not_null
 
-      - name: source_provider
-        description: "Source system/provider of the data."
 
-      - name: load_type
-        description: "Indicates whether the data came from historical or incremental ingestion."
+models:
+  - name: etf_prices_raw
+    description: "Incremental Bronze Delta table containing historical and daily ETF prices."
 
-      - name: batch_id
-        description: "Unique ingestion batch identifier."
+    columns:
+      - name: symbol
+        data_tests:
+          - not_null
 
-      - name: ingested_at_utc
-        description: "Timestamp when the data was ingested locally."
+      - name: price_date
+        data_tests:
+          - not_null
+
+      - name: adjusted_close
+        data_tests:
+          - not_null
+
+      - name: volume
+        data_tests:
+          - not_null

@@ -1,134 +1,174 @@
 # ETF Market Intelligence Pipeline
 
-> **Project status: In progress**
->
-> 
-> The historical batch pipeline, Databricks Medallion layers, dbt models/tests, and Streamlit dashboard are working. Daily incremental ingestion, orchestration, alert delivery, and public deployment are still under development.
+[![Status](https://img.shields.io/badge/status-in%20progress-F59E0B)](https://github.com/Hamza-Abbas/ETF-Market-Intelligence-Pipeline)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![dbt](https://img.shields.io/badge/dbt%20Core-1.12-FF694B?logo=dbt&logoColor=white)](https://www.getdbt.com/)
+[![Databricks](https://img.shields.io/badge/Databricks-Delta%20Lake-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Analytics%20Dashboard-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 
-A Data Engineering portfolio project that collects ETF market data from Yahoo Finance, processes it through Bronze, Silver, and Gold layers in Databricks using dbt, and serves analytics through an interactive Streamlit dashboard.
+An end-to-end Data Engineering portfolio project that ingests daily ETF market data from Yahoo Finance, incrementally loads it into Databricks, transforms it through a **Bronze → Silver → Gold Medallion Architecture** with dbt, and serves analytics through an interactive Streamlit and Plotly dashboard.
 
-The project currently tracks **20 USD-listed ETFs** across US, global, international, emerging-market, bond, technology, and commodity exposures.
+The project tracks **20 USD-listed ETFs** across US, global, international, emerging-market, technology, bond, and commodity exposures.
 
----
+> **Project status — in progress:** Historical ingestion, Databricks Medallion layers, dbt models and tests, five analytical Gold marts, and the Streamlit dashboard are complete. The latest-day extractor and dbt incremental Bronze model are implemented. Manual end-to-end validation, local scheduling, dashboard auto-refresh, and Gmail notifications are the next milestone.
 
-## Current Progress
+## Project Snapshot
 
-| Component | Status |
-|---|---|
-| Historical ETF ingestion with Python and `yfinance` | Complete |
-| Local partitioned Bronze CSV files | Complete |
-| Combined historical upload file | Complete |
-| Databricks Bronze table | Complete |
-| dbt Silver cleaning and daily return calculations | Complete |
-| dbt Gold analytical marts | Complete |
-| dbt data-quality tests | Complete |
-| ETF universe expanded to 20 ETFs | Complete |
-| Streamlit dashboard connected directly to Databricks Gold | Complete |
-| ETF metadata and business-friendly names | Complete |
-| Daily incremental ingestion | **Planned** |
-| Databricks Bronze `MERGE` / upsert process | **Planned** |
-| Scheduled pipeline execution | **Planned** |
-| AWS EventBridge and Lambda automation | **Planned** |
-| AWS SNS alert delivery | **Planned** |
-| Public dashboard deployment | **Planned** |
+Validated on **22 July 2026** before the local automation phase:
 
----
+| Metric | Current value |
+| --- | ---: |
+| ETFs tracked | 20 |
+| Bronze price records | 58,060 |
+| Historical range | 2015-01-02 to 2026-07-21 |
+| Duplicate `(symbol, price_date)` keys | 0 |
+| dbt models | 7 |
+| dbt data tests | 85 |
+| Gold analytical marts | 5 |
+| Databricks storage format | Delta |
+| Dashboard views | 5 |
+
+These figures describe the current development dataset and will grow as daily incremental loads are activated.
+
+## Why This Project Matters
+
+This project demonstrates practical Data Engineering and Analytics Engineering skills:
+
+- building configuration-driven Python ingestion pipelines;
+- separating historical bootstrap and daily incremental processing;
+- implementing idempotent Delta Lake loads with dbt `MERGE`;
+- applying Medallion Architecture in Databricks;
+- creating modular SQL transformations and analytical marts;
+- enforcing data quality at documented table grains;
+- preserving audit metadata with batch IDs and ingestion timestamps;
+- serving warehouse data through an interactive analytics application;
+- preparing a batch pipeline for scheduling, monitoring, and alerting.
 
 ## Architecture
 
-### Current working architecture
-
-```text
-Yahoo Finance
-      ↓
-Python historical ingestion
-      ↓
-Local Bronze CSV files
-      ↓
-Combined dbt seed file
-      ↓
-Databricks Bronze
-      ↓
-dbt Silver
-      ↓
-dbt Gold marts
-      ↓
-Databricks SQL Warehouse
-      ↓
-Streamlit + Plotly dashboard
+```mermaid
+flowchart TD
+    A[Yahoo Finance] --> B[Python ingestion]
+    B --> C[Local Bronze CSV files]
+    C --> D[dbt landing seed]
+    D --> E[(Databricks Bronze Delta)]
+    E --> F[(dbt Silver)]
+    F --> G[(dbt Gold marts)]
+    G --> H[Databricks SQL Warehouse]
+    H --> I[Streamlit and Plotly]
 ```
 
-### Target architecture
+### Historical Bootstrap
+
+The initial historical load fetched daily OHLCV prices from 2015 onward, validated each local file, combined the data, and loaded the original Bronze table. This established the **58,060-row baseline** currently stored in Databricks.
 
 ```text
-Yahoo Finance
-      ↓
-Daily incremental Python ingestion
-      ↓
-Databricks Bronze MERGE
-      ↓
-dbt Silver and Gold
-      ↓
-dbt tests and freshness checks
-      ↓
-Streamlit dashboard
-      ↓
-AWS SNS alerts
-
-Scheduled by AWS EventBridge / Lambda
+yfinance historical download
+        → partitioned local Bronze CSV files
+        → validation and combined bootstrap dataset
+        → Databricks Bronze Delta table
 ```
 
-The dashboard is live relative to the most recent successful pipeline and dbt refresh. It is not a real-time exchange-price feed.
+### Daily Incremental Design
 
----
+The current incremental implementation requests the newest available daily candle for each configured ETF and creates a small landing batch.
 
-## Tech Stack
+```text
+Latest daily ETF records
+        → seeds/etf_prices_incremental.csv
+        → temporary dbt landing table
+        → dbt incremental MERGE
+        → bronze.etf_prices_raw
+        → Silver and Gold refresh
+        → Streamlit dashboard
+```
 
-### Data ingestion
+The Bronze model uses:
 
-- Python
-- `yfinance`
-- pandas
-- Loguru
-- YAML configuration
-- CSV-based local Bronze storage
+- `materialized='incremental'`;
+- `incremental_strategy='merge'`;
+- `unique_key=['symbol', 'price_date']`;
+- Delta Lake storage;
+- a filter that accepts records newer than the current Bronze maximum date;
+- `full_refresh=false` to protect the historical table from accidental rebuilds.
 
-### Data platform and transformation
+This makes the warehouse load idempotent: rerunning a batch does not create a second record for the same ETF and trading date.
 
-- Databricks Free Edition
-- Databricks SQL Warehouse
-- dbt Core
-- `dbt-databricks`
-- SQL
-- Medallion Architecture
+## Medallion Architecture
 
-### Dashboard
+| Layer | Purpose | Main output |
+| --- | --- | --- |
+| Bronze | Preserve source values and ingestion metadata at daily ETF grain | `bronze.etf_prices_raw` |
+| Silver | Clean, standardize, validate, and calculate daily price movements | `silver.etf_prices_cleaned` |
+| Gold | Publish business-ready performance, market, risk, and alert datasets | Five analytical marts |
+| Serving | Query curated Gold data through Databricks SQL | Streamlit dashboard |
 
-- Streamlit
-- Plotly
-- Databricks SQL Connector
-- Cached Databricks queries
-- Secure Streamlit secrets
+### Bronze Layer
 
-### Development
+The Bronze Delta table keeps the original market fields together with operational metadata:
 
-- `uv`
-- Git
-- GitHub
-- VS Code
+```text
+symbol, price_date, open, high, low, close, adjusted_close, volume,
+source_provider, load_type, batch_id, ingested_at_utc
+```
 
-### Planned automation
+Its documented grain is:
 
-- AWS Lambda
-- AWS EventBridge
-- AWS SNS
+```text
+one row per ETF per trading date
+```
 
----
+### Silver Layer
+
+`silver.etf_prices_cleaned`:
+
+- standardizes raw field names;
+- removes records missing required business fields;
+- rejects invalid ranges where `high < low`;
+- calculates the previous adjusted closing price;
+- calculates daily return and daily return percentage;
+- adds a five-trading-day adjusted-close comparison;
+- preserves source and batch lineage for traceability.
+
+### Gold Analytical Marts
+
+| Model | Grain | Business purpose |
+| --- | --- | --- |
+| `etf_long_term_performance` | One row per ETF | First/latest prices and total return since 2015 |
+| `etf_month_by_month_performance` | One row per ETF per month | Monthly movement, return, and trading-day count |
+| `etf_monthly_market_summary` | One row per month | Market breadth, average return, and monthly leaders |
+| `etf_risk_summary` | One row per ETF | Volatility, positive-month ratio, and return-to-risk metrics |
+| `etf_alert_candidates` | One row per qualifying ETF/month | Strong gains, sharp drops, and momentum events |
+
+Current alert rules:
+
+| Monthly return | Alert type | Severity |
+| ---: | --- | :---: |
+| `>= 8%` | `STRONG_GAIN` | High |
+| `<= -8%` | `SHARP_DROP` | High |
+| `>= 4%` | `POSITIVE_MOMENTUM` | Medium |
+| `<= -4%` | `NEGATIVE_MOMENTUM` | Medium |
+
+The alert mart currently supports dashboard analysis. Email delivery is part of the next phase.
+
+## Streamlit Dashboard
+
+The Streamlit application connects to the Databricks SQL Warehouse and reads curated Gold tables rather than querying raw CSV files.
+
+It provides five analytical views:
+
+- **Overview:** coverage, freshness, performance ranking, market breadth, and risk-return positioning;
+- **ETF Explorer:** adjusted-price history, monthly returns, normalized growth, return heatmaps, and CSV export;
+- **Risk & Return:** volatility, positive-month ratios, return-to-risk comparison, and detailed metrics;
+- **Market History:** monthly return ranges, breadth trends, and winner history;
+- **Alerts:** severity and alert-type filters, latest events, distributions, and CSV export.
+
+ETF symbols are mapped to full business-friendly names and classifications through a separate metadata configuration. Query results are cached for five minutes, and the current dashboard includes a manual **Refresh from Databricks** action.
 
 ## ETF Universe
 
 | Symbol | ETF |
-|---|---|
+| --- | --- |
 | VOO | Vanguard S&P 500 ETF |
 | SPY | SPDR S&P 500 ETF Trust |
 | QQQ | Invesco QQQ Trust |
@@ -150,475 +190,225 @@ The dashboard is live relative to the most recent successful pipeline and dbt re
 | EWU | iShares MSCI United Kingdom ETF |
 | EWZ | iShares MSCI Brazil ETF |
 
-Symbols are configured in:
+Symbols are maintained in `config/etf_symbols.yml`; names and classifications are maintained in `config/etf_metadata.yml`.
 
-```text
-config/etf_symbols.yml
-```
-
-ETF names and classifications are maintained in:
-
-```text
-config/etf_metadata.yml
-```
-
----
-
-## Project Structure
+## Repository Structure
 
 ```text
 daily_etf_market_intelligence_pipeline/
-│
-├── .streamlit/
-│   └── secrets.toml                 # Local only; never commit
-│
 ├── config/
 │   ├── etf_symbols.yml
 │   └── etf_metadata.yml
-│
 ├── dashboard/
 │   ├── app.py
 │   └── services/
-│       ├── __init__.py
 │       ├── databricks_service.py
 │       └── metadata_service.py
-│
-├── data/
+├── data/                              # Generated locally; excluded from Git
+│   ├── bootstrap/
 │   └── bronze/
-│       └── yahoo_finance/
-│
-├── src/
-│   ├── ingestion/
-│   │   ├── fetch_historical_prices.py
-│   │   ├── check_bronze_files.py
-│   │   └── create_databricks_upload_file.py
-│   │
-│   └── utils/
-│       └── config_loader.py
-│
 ├── etf_intelligence_pipeline/
 │   ├── dbt_project.yml
+│   ├── macros/
 │   ├── models/
 │   │   ├── bronze/
+│   │   │   └── etf_prices_raw.sql
 │   │   ├── silver/
 │   │   └── gold/
 │   ├── seeds/
-│   ├── tests/
-│   └── macros/
-│
+│   │   └── etf_prices_incremental.csv
+│   └── tests/
+├── src/
+│   ├── ingestion/
+│   │   ├── fetch_historical_prices.py
+│   │   ├── fetch_incremental_prices.py
+│   │   ├── check_bronze_files.py
+│   │   └── create_databricks_upload_file.py
+│   └── utils/
+│       └── config_loader.py
 ├── .gitignore
 ├── pyproject.toml
 ├── uv.lock
 └── README.md
 ```
 
----
-
-## Medallion Architecture
-
-### Bronze
-
-The Bronze layer preserves raw historical ETF price data fetched from Yahoo Finance.
-
-Local files are stored under:
-
-```text
-data/bronze/yahoo_finance/
-```
-
-The combined historical file is written to:
-
-```text
-data/bronze/yahoo_finance_upload/etf_prices_historical.csv
-```
-
-Databricks table:
-
-```text
-etf_market_intelligence.bronze.etf_prices_raw
-```
-
-Main fields include:
-
-- ETF symbol
-- Trading date
-- Open, high, low, and close
-- Adjusted close
-- Trading volume
-- Source provider
-- Load type
-- Batch ID
-- Ingestion timestamp
-
-### Silver
-
-Silver model:
-
-```text
-etf_market_intelligence.silver.etf_prices_cleaned
-```
-
-The Silver layer:
-
-- standardizes column names;
-- removes unusable records;
-- validates required price fields;
-- checks that daily high is not below daily low;
-- calculates the previous adjusted closing price;
-- calculates daily return and daily return percentage;
-- calculates a five-trading-day comparison value;
-- keeps one row per ETF per trading day.
-
-### Gold
-
-Current Gold marts:
-
-```text
-etf_market_intelligence.gold.etf_long_term_performance
-etf_market_intelligence.gold.etf_month_by_month_performance
-etf_market_intelligence.gold.etf_monthly_market_summary
-etf_market_intelligence.gold.etf_risk_summary
-etf_market_intelligence.gold.etf_alert_candidates
-```
-
-#### `etf_long_term_performance`
-
-One row per ETF with:
-
-- first and latest trading dates;
-- first and latest adjusted closing prices;
-- total price return;
-- total return percentage.
-
-#### `etf_month_by_month_performance`
-
-One row per ETF and month with:
-
-- first and last trading dates;
-- first and last adjusted closing prices;
-- monthly return;
-- monthly return percentage;
-- trading-day count.
-
-#### `etf_monthly_market_summary`
-
-One row per month with:
-
-- number of tracked ETFs;
-- positive, negative, and flat ETF counts;
-- average monthly return;
-- best and worst monthly returns;
-- best-performing ETF.
-
-#### `etf_risk_summary`
-
-One row per ETF with:
-
-- total, positive, negative, and flat month counts;
-- average monthly return;
-- best and worst month;
-- monthly volatility;
-- positive-month ratio.
-
-#### `etf_alert_candidates`
-
-Identifies historically significant monthly movements for future alert delivery.
-
-Current alert categories include:
-
-| Condition | Alert type | Severity |
-|---:|---|---|
-| Monthly return `>= 8%` | `STRONG_GAIN` | High |
-| Monthly return `<= -8%` | `SHARP_DROP` | High |
-| Monthly return `>= 4%` | `POSITIVE_MOMENTUM` | Medium |
-| Monthly return `<= -4%` | `NEGATIVE_MOMENTUM` | Medium |
-
-The mart currently supports analysis in Streamlit. Sending notifications through AWS SNS is planned.
-
----
-
-## Streamlit Dashboard
-
-The dashboard queries the Databricks Gold tables directly through the Databricks SQL Connector.
-
-Current pages:
-
-### Overview
-
-- ETF coverage
-- Latest trading date
-- Latest market month
-- Monthly leader
-- Best long-term performer
-- Lowest monthly volatility
-- Long-term performance ranking
-- Market breadth
-- Risk-return overview
-
-### ETF Explorer
-
-- Business-friendly ETF name and ticker selection
-- Monthly adjusted closing-price history
-- Monthly returns
-- Normalized growth of `$100`
-- Monthly return heatmap
-- Downloadable monthly history
-
-### Risk & Return
-
-- Monthly return versus volatility
-- Positive-month ratio
-- Cross-ETF comparison
-- Volatility ranking
-- Detailed risk summary
-
-### Market History
-
-- Monthly average, best, and worst ETF returns
-- Positive and negative market breadth
-- Monthly winner leaderboard
-- Downloadable market history
-
-### Alerts
-
-- Alert-severity and alert-type filters
-- Historical ETF alert distribution
-- Latest alert records
-- Downloadable alert data
-
-The dashboard uses a reusable query service, five-minute result caching, and a metadata service that converts ticker symbols into complete ETF names.
-
----
-
 ## Local Setup
 
 ### Prerequisites
 
 - Python 3.11 or newer
-- `uv`
+- [`uv`](https://docs.astral.sh/uv/)
 - Git
-- A Databricks workspace and SQL warehouse
-- A Databricks personal access token with only the required SQL/BI permissions
+- A Databricks workspace and SQL Warehouse
+- dbt Core and `dbt-databricks`
 
-### 1. Clone the repository
-
-```powershell
-git clone <YOUR_REPOSITORY_URL>
-cd daily_etf_market_intelligence_pipeline
-```
-
-### 2. Recreate the Python environment
+### 1. Clone and install
 
 ```powershell
+git clone https://github.com/Hamza-Abbas/ETF-Market-Intelligence-Pipeline.git
+cd ETF-Market-Intelligence-Pipeline
 uv sync
 ```
 
-The environment is reproducible from:
+### 2. Configure dbt
 
-```text
-pyproject.toml
-uv.lock
+Store the Databricks connection in `%USERPROFILE%\.dbt\profiles.yml`. Keep secrets out of the repository and reference environment variables where possible.
+
+Validate the connection:
+
+```powershell
+cd etf_intelligence_pipeline
+dbt debug
+cd ..
 ```
 
-Do not commit `.venv`.
+### 3. Configure Streamlit
 
-### 3. Configure Databricks secrets
-
-Create:
-
-```text
-.streamlit/secrets.toml
-```
-
-Use this structure:
+Create `.streamlit/secrets.toml` locally:
 
 ```toml
 [databricks]
 server_hostname = "YOUR_SERVER_HOSTNAME"
 http_path = "/sql/1.0/warehouses/YOUR_WAREHOUSE_ID"
 access_token = "YOUR_ACCESS_TOKEN"
-catalog = "etf_market_intelligence"
+catalog = "etf"
 schema = "gold"
 ```
 
-Never commit this file. It must be listed in `.gitignore`.
+Never commit this file.
 
-### 4. Validate dbt connectivity
+## Run the Daily Incremental Pipeline Manually
+
+Run the extractor from the repository root:
 
 ```powershell
-cd etf_intelligence_pipeline
-uv run dbt debug
+python .\src\ingestion\fetch_incremental_prices.py
+```
+
+Load the small landing batch and rebuild the dbt dependency graph:
+
+```powershell
+cd .\etf_intelligence_pipeline
+dbt seed --select etf_prices_incremental --full-refresh
+dbt run --select etf_prices_raw+
+dbt test --select etf_prices_raw+
 cd ..
 ```
 
-### 5. Run the dashboard
+The trailing `+` selects `etf_prices_raw` and every downstream Silver and Gold model that depends on it.
+
+Start the dashboard:
 
 ```powershell
-uv run streamlit run dashboard/app.py
+streamlit run .\dashboard\app.py
 ```
 
-Local URL:
-
-```text
-http://localhost:8501
-```
-
-Stop the dashboard with:
-
-```text
-Ctrl + C
-```
-
----
-
-## Rebuild the Historical Pipeline
-
-Run from the repository root unless stated otherwise.
-
-### 1. Fetch historical ETF prices
-
-```powershell
-uv run python -m src.ingestion.fetch_historical_prices
-```
-
-### 2. Validate local Bronze files
-
-```powershell
-uv run python -m src.ingestion.check_bronze_files
-```
-
-### 3. Create the combined upload file
-
-```powershell
-uv run python -m src.ingestion.create_databricks_upload_file
-```
-
-### 4. Copy the combined file into the dbt seed directory
-
-```powershell
-Copy-Item `
-  data\bronze\yahoo_finance_upload\etf_prices_historical.csv `
-  etf_intelligence_pipeline\seeds\etf_prices_raw.csv `
-  -Force
-```
-
-### 5. Load Bronze and rebuild the analytical layers
-
-```powershell
-cd etf_intelligence_pipeline
-
-uv run dbt seed --full-refresh --select etf_prices_raw
-uv run dbt run --select silver gold
-uv run dbt test --select silver gold
-```
-
-Return to the root:
-
-```powershell
-cd ..
-```
-
-After a successful dbt refresh, use **Refresh from Databricks** in the Streamlit sidebar.
-
----
+After a successful warehouse refresh, use **Refresh from Databricks** in the sidebar to clear the dashboard cache and rerun the queries.
 
 ## Data Quality
 
-The project uses dbt tests and validation queries to protect important assumptions, including:
+The project currently contains **85 dbt data tests**, supported by ingestion checks and custom SQL tests. They protect the pipeline's core assumptions:
 
-- required symbols and trading dates are not null;
-- required OHLCV fields are present;
-- ETF/date records are unique where expected;
+- required symbols, dates, OHLCV values, and analytical fields are not null;
+- `(symbol, price_date)` remains unique in Bronze and Silver;
 - invalid daily price ranges are rejected;
-- Silver and Gold models return expected grains;
-- custom business-rule tests pass.
+- model grains remain stable across Silver and Gold;
+- return, volatility, market-breadth, and alert fields satisfy business rules;
+- the landing batch contains the expected configured ETFs before loading.
 
-Example validation query:
+Example Bronze validation:
+
+```sql
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT symbol) AS total_symbols,
+    MIN(price_date) AS earliest_date,
+    MAX(price_date) AS latest_date
+FROM etf.bronze.etf_prices_raw;
+```
+
+Duplicate-key check:
 
 ```sql
 SELECT
     symbol,
-    COUNT(*) AS row_count,
-    MIN(price_date) AS first_date,
-    MAX(price_date) AS latest_date
-FROM etf_market_intelligence.silver.etf_prices_cleaned
-GROUP BY symbol
-ORDER BY symbol;
+    price_date,
+    COUNT(*) AS row_count
+FROM etf.bronze.etf_prices_raw
+GROUP BY symbol, price_date
+HAVING COUNT(*) > 1;
 ```
-
----
 
 ## Security
 
-The following files must not be committed:
+Never commit credentials or generated runtime artifacts. Keep the following outside version control:
 
-```text
-.streamlit/secrets.toml
-.venv/
-logs/
-```
+- `.env`;
+- `.streamlit/secrets.toml`;
+- `%USERPROFILE%\.dbt\profiles.yml`;
+- `.venv/`;
+- `logs/`;
+- dbt `target/` and `dbt_packages/`;
+- generated Bronze datasets and bootstrap CSV files.
 
-Before pushing changes, verify:
+Before every push, inspect both unstaged and staged changes:
 
 ```powershell
-git check-ignore -v .streamlit/secrets.toml
-git status
+git status --short
+git diff
+git diff --cached
 ```
 
-The dashboard token is used only for querying the Databricks SQL warehouse and should follow the principle of least privilege.
+## Current Delivery Status
 
----
+| Capability | Status |
+| --- | :---: |
+| Historical ingestion for 20 ETFs | ✅ Complete |
+| 58,060-row Bronze Delta baseline | ✅ Complete |
+| Silver transformation layer | ✅ Complete |
+| Five Gold analytical marts | ✅ Complete |
+| 85 dbt data tests | ✅ Complete |
+| Five-view Streamlit dashboard | ✅ Complete |
+| Full ETF names and classifications | ✅ Complete |
+| Latest-day Python extractor | ✅ Implemented |
+| dbt incremental Bronze `MERGE` | ✅ Implemented |
+| Manual end-to-end incremental validation | 🟡 In progress |
+| Windows Task Scheduler orchestration | ⏳ Next |
+| Gmail success/failure notifications | ⏳ Next |
+| Dashboard automatic refresh | ⏳ Next |
+| AWS EventBridge, Lambda, and SNS | 🗓️ Future |
+| Public dashboard deployment | 🗓️ Future |
 
 ## Roadmap
 
-### Next phase: daily incremental ingestion
+### Phase 1 — Complete Local Automation
 
-- determine the latest loaded date for each ETF;
-- fetch only missing trading days;
-- label each ingestion run with a batch ID;
-- keep historical and incremental loads auditable;
-- prevent duplicates using `symbol + price_date`;
-- replace recurring full seed refreshes with a scalable Bronze load and `MERGE`.
+- validate the latest-day extraction and Delta `MERGE` end to end;
+- create one orchestration script for extraction, dbt, tests, and validation;
+- schedule weekday runs with Windows Task Scheduler;
+- report success, no-new-data, and failure outcomes through Gmail;
+- add dashboard auto-refresh or a controlled cache time-to-live.
 
-### Automation
+### Phase 2 — Cloud Automation and Observability
 
-- schedule ingestion using AWS EventBridge;
-- run the ingestion and transformation workflow using AWS Lambda or an appropriate lightweight runner;
-- execute dbt models and tests after each successful load;
-- record pipeline status and freshness.
+- move scheduling to AWS EventBridge;
+- run ingestion and transformation with an appropriate cloud execution service;
+- publish selected notifications through AWS SNS;
+- add structured run logs, freshness checks, and failure monitoring;
+- prevent repeat notifications for previously processed alerts.
 
-### Alert delivery
+### Phase 3 — Deployment and Analytics Expansion
 
-- use `etf_alert_candidates` as the source for alert decisions;
-- publish strong gains, sharp drops, and other selected conditions through AWS SNS;
-- avoid duplicate notifications for previously processed ETF/month events.
+- deploy the Streamlit application;
+- add dashboard and dbt-lineage screenshots to this README;
+- extend analytics with drawdown, annualized volatility, volume, and rolling-return views.
 
-### Dashboard and deployment
+## Author
 
-- add daily-grain price and volume charts;
-- add drawdown and annualized risk metrics;
-- add pipeline-health and freshness views;
-- deploy the Streamlit dashboard publicly;
-- add dashboard and dbt-lineage screenshots to this README.
+**Hamza Abbas** — Aspiring Data Engineer focused on Python, SQL, dbt, Databricks, Snowflake, cloud data platforms, and analytics engineering.
 
----
-
-## Portfolio Purpose
-
-This project demonstrates:
-
-- Python-based ingestion;
-- configuration-driven ETF processing;
-- Databricks and Medallion Architecture;
-- modular dbt transformations;
-- data-quality testing;
-- analytics-ready Gold modeling;
-- secure SQL connectivity;
-- Streamlit and Plotly dashboard development;
-- separation of ingestion, transformation, and presentation responsibilities;
-- a clear path toward incremental processing and cloud automation.
-
----
+- [LinkedIn](https://www.linkedin.com/in/hamza-abbas-data-engineer/)
+- [GitHub](https://github.com/Hamza-Abbas)
 
 ## Disclaimer
 

@@ -49,7 +49,7 @@ seeds:
     +schema: bronze
     +quote_columns: false
 
-    etf_prices_raw:
+    etf_prices_incremental:
       +column_types:
         symbol: string
         price_date: date
