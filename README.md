@@ -4,13 +4,12 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![dbt](https://img.shields.io/badge/dbt%20Core-1.12-FF694B?logo=dbt&logoColor=white)](https://www.getdbt.com/)
 [![Databricks](https://img.shields.io/badge/Databricks-Delta%20Lake-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-Analytics%20Dashboard-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 
-An end-to-end Data Engineering portfolio project that ingests daily ETF market data from Yahoo Finance, incrementally loads it into Databricks, transforms it through a **Bronze → Silver → Gold Medallion Architecture** with dbt, and serves analytics through an interactive Streamlit and Plotly dashboard.
+An end-to-end Data Engineering portfolio project that ingests daily ETF market data from Yahoo Finance, incrementally loads it into Databricks, and transforms it through a **Bronze → Silver → Gold Medallion Architecture** with dbt, all orchestrated end to end by a scheduled Databricks Job.
 
 The project tracks **20 USD-listed ETFs** across US, global, international, emerging-market, technology, bond, and commodity exposures.
 
-> **Project status — automated:** Historical ingestion, Databricks Medallion layers, dbt models and tests, five analytical Gold marts, and the Streamlit dashboard are complete. A daily Databricks Job now runs the pipeline end to end on a schedule: the latest-day extractor merges straight into Bronze, then dbt builds and tests Silver and Gold. A native Databricks dashboard on the Gold marts, with a scheduled refresh, is the next milestone.
+> **Project status — automated:** Historical ingestion, Databricks Medallion layers, dbt models and tests, and five analytical Gold marts are complete. A daily Databricks Job now runs the pipeline end to end on a schedule: the extractor merges straight into Bronze, then dbt builds and tests Silver and Gold. The earlier Streamlit prototype has been retired; a native Databricks dashboard on the Gold marts, refreshed by the same daily Job, is the next milestone.
 
 ## Project Snapshot
 
@@ -26,7 +25,6 @@ Validated on **24 July 2026**, the first day the full pipeline ran unattended on
 | dbt data tests | 82 |
 | Gold analytical marts | 5 |
 | Databricks storage format | Delta |
-| Dashboard views | 5 |
 
 These figures grow daily now that the incremental load runs automatically; treat them as a point in time snapshot rather than a fixed count.
 
@@ -42,7 +40,7 @@ This project demonstrates practical Data Engineering and Analytics Engineering s
 - creating modular SQL transformations and analytical marts;
 - enforcing data quality at documented table grains;
 - preserving audit metadata with batch IDs and ingestion timestamps;
-- serving warehouse data through an interactive analytics application;
+- structuring curated Gold marts for downstream dashboards and reporting;
 - preparing a batch pipeline for scheduling, monitoring, and alerting.
 
 ## Architecture
@@ -54,18 +52,17 @@ flowchart TD
     C --> D[(dbt Silver)]
     D --> E[(dbt Gold marts)]
     E --> F[Databricks SQL Warehouse]
-    F --> G[Streamlit and Plotly]
 ```
 
 ### Historical Bootstrap
 
-The initial historical load fetched daily OHLCV prices from 2015 onward, validated each local file, combined the data, and loaded the original Bronze table. This established the **58,060-row baseline** currently stored in Databricks.
+`fetch_historical_prices.py` fetches the full daily OHLCV history for every configured ETF from 2015 onward and merges it straight into Bronze the same way the daily job does, no local CSV, no seed, a Spark `MERGE` from inside a Databricks Job task. This established the initial Bronze baseline, and because the merge is idempotent, the same script also works as a recovery tool: if the daily incremental job ever fails or misses a run, running this again backfills whatever is missing without creating duplicates.
 
 ```text
-yfinance historical download
-        → partitioned local Bronze CSV files
-        → validation and combined bootstrap dataset
-        → Databricks Bronze Delta table
+yfinance historical download (per ETF, from 2015)
+        → pandas batch in memory
+        → Spark DataFrame (temp view)
+        → MERGE INTO bronze.etf_prices_raw
 ```
 
 ### Daily Incremental Design
@@ -78,7 +75,6 @@ Latest daily ETF records
         → Spark DataFrame (temp view)
         → MERGE INTO bronze.etf_prices_raw
         → dbt build: Silver and Gold
-        → Streamlit dashboard
 ```
 
 The merge matches on `symbol` and `price_date`, updating existing rows and inserting new ones, so rerunning a batch never creates a duplicate record for the same ETF and trading date. `etf_prices_raw` is declared as a dbt **source** rather than a dbt model, since the Databricks Job populates it directly; Silver reads from that source with `{{ source('bronze', 'etf_prices_raw') }}`.
@@ -101,7 +97,7 @@ Both tasks pull the current `main` branch fresh on every run, so a push to GitHu
 | Bronze | Preserve source values and ingestion metadata at daily ETF grain | `bronze.etf_prices_raw` |
 | Silver | Clean, standardize, validate, and calculate daily price movements | `silver.etf_prices_cleaned` |
 | Gold | Publish business-ready performance, market, risk, and alert datasets | Five analytical marts |
-| Serving | Query curated Gold data through Databricks SQL | Streamlit dashboard |
+| Serving | Query curated Gold data through Databricks SQL | Databricks SQL Warehouse |
 
 ### Bronze Layer
 
@@ -151,20 +147,6 @@ Current alert rules:
 
 The alert mart currently supports dashboard analysis. Email delivery is part of the next phase.
 
-## Streamlit Dashboard
-
-The Streamlit application connects to the Databricks SQL Warehouse and reads curated Gold tables rather than querying raw CSV files.
-
-It provides five analytical views:
-
-- **Overview:** coverage, freshness, performance ranking, market breadth, and risk-return positioning;
-- **ETF Explorer:** adjusted-price history, monthly returns, normalized growth, return heatmaps, and CSV export;
-- **Risk & Return:** volatility, positive-month ratios, return-to-risk comparison, and detailed metrics;
-- **Market History:** monthly return ranges, breadth trends, and winner history;
-- **Alerts:** severity and alert-type filters, latest events, distributions, and CSV export.
-
-ETF symbols are mapped to full business-friendly names and classifications through a separate metadata configuration. Query results are cached for five minutes, and the current dashboard includes a manual **Refresh from Databricks** action.
-
 ## ETF Universe
 
 | Symbol | ETF |
@@ -199,11 +181,6 @@ daily_etf_market_intelligence_pipeline/
 ├── config/
 │   ├── etf_symbols.yml
 │   └── etf_metadata.yml
-├── dashboard/
-│   ├── app.py
-│   └── services/
-│       ├── databricks_service.py
-│       └── metadata_service.py
 ├── data/                              # Generated locally; excluded from Git
 │   ├── bootstrap/
 │   └── bronze/
@@ -218,7 +195,7 @@ daily_etf_market_intelligence_pipeline/
 │   └── tests/
 ├── src/
 │   ├── ingestion/
-│   │   ├── fetch_historical_prices.py
+│   │   ├── fetch_historical_prices.py  # Databricks Job task; also doubles as a recovery tool
 │   │   ├── fetch_incremental_prices.py # Runs as a Databricks Job task, merges straight into Bronze
 │   │   ├── check_bronze_files.py
 │   │   └── create_databricks_upload_file.py
@@ -232,7 +209,7 @@ daily_etf_market_intelligence_pipeline/
 
 ## Local Setup
 
-The daily ingestion task runs on Databricks now, not on your machine (see [Daily Orchestration](#daily-orchestration)). This local setup is for developing dbt models and running the dashboard.
+The daily ingestion task runs on Databricks now, not on your machine (see [Daily Orchestration](#daily-orchestration)). This local setup is for developing and testing dbt models.
 
 ### Prerequisites
 
@@ -262,21 +239,6 @@ dbt debug
 cd ..
 ```
 
-### 3. Configure Streamlit
-
-Create `.streamlit/secrets.toml` locally:
-
-```toml
-[databricks]
-server_hostname = "YOUR_SERVER_HOSTNAME"
-http_path = "/sql/1.0/warehouses/YOUR_WAREHOUSE_ID"
-access_token = "YOUR_ACCESS_TOKEN"
-catalog = "etf_market_intelligence"
-schema = "gold"
-```
-
-Never commit this file.
-
 ## Running the Pipeline
 
 ### Automated (production)
@@ -293,17 +255,9 @@ dbt build --select silver gold
 cd ..
 ```
 
-Start the dashboard:
-
-```powershell
-streamlit run .\dashboard\app.py
-```
-
-After a successful warehouse refresh, use **Refresh from Databricks** in the sidebar to clear the dashboard cache and rerun the queries.
-
 ## Data Quality
 
-The project currently contains **85 dbt data tests**, supported by ingestion checks and custom SQL tests. They protect the pipeline's core assumptions:
+The project currently contains **82 dbt data tests**, supported by ingestion checks and custom SQL tests. They protect the pipeline's core assumptions:
 
 - required symbols, dates, OHLCV values, and analytical fields are not null;
 - `(symbol, price_date)` remains unique in Bronze and Silver;
@@ -340,7 +294,6 @@ HAVING COUNT(*) > 1;
 Never commit credentials or generated runtime artifacts. Keep the following outside version control:
 
 - `.env`;
-- `.streamlit/secrets.toml`;
 - `%USERPROFILE%\.dbt\profiles.yml`;
 - `.venv/`;
 - `logs/`;
@@ -364,7 +317,6 @@ git diff --cached
 | Silver transformation layer | ✅ Complete |
 | Five Gold analytical marts | ✅ Complete |
 | dbt data tests on Silver and Gold | ✅ Complete |
-| Five-view Streamlit dashboard | ✅ Complete |
 | Full ETF names and classifications | ✅ Complete |
 | Daily extractor, merges straight into Bronze via Spark | ✅ Complete |
 | `bronze.etf_prices_raw` as a dbt source, no seed step | ✅ Complete |
@@ -374,6 +326,7 @@ git diff --cached
 | Scheduled dashboard refresh | ⏳ Next |
 | Gmail success/failure notifications | ⏳ Next |
 | Public dashboard deployment | 🗓️ Future |
+| Streamlit prototype | 🗑️ Retired, replaced by a native Databricks dashboard |
 
 ## Roadmap
 
@@ -385,15 +338,14 @@ git diff --cached
 
 ### Phase 2 — Dashboarding and Observability
 
-- build a native Databricks dashboard on the Gold marts alongside the existing Streamlit app;
+- build a native Databricks dashboard on the Gold marts, replacing the retired Streamlit prototype;
 - schedule that dashboard's refresh to follow the daily Job;
 - add structured run logs, freshness checks, and failure monitoring;
 - report success, no-new-data, and failure outcomes through Gmail;
 - prevent repeat notifications for previously processed alerts.
 
-### Phase 3 — Deployment and Analytics Expansion
+### Phase 3 — Analytics Expansion
 
-- deploy the Streamlit application;
 - add dashboard and dbt-lineage screenshots to this README;
 - extend analytics with drawdown, annualized volatility, volume, and rolling-return views.
 

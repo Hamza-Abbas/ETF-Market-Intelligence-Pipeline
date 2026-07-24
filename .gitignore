@@ -23,5 +23,4 @@ etf_intelligence_pipeline/dbt_packages/
 etf_intelligence_pipeline/models/bronze/etf_prices_raw_backup.sql
 src/ingestion/fetch_incremental_prices_backup.py
 
-# Streamlit credentials
-.streamlit/secrets.toml
+.streamlit/
