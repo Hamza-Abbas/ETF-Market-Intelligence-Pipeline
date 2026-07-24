@@ -1,3 +1,4 @@
+import inspect
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -19,7 +20,23 @@ from pyspark.sql.types import (
 from src.utils.config_loader import load_yaml_config
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+def resolve_project_root() -> Path:
+    """Locate the project root even when __file__ is not set.
+
+    Databricks Python script tasks run from a Git source execute the
+    file through exec() without setting __file__, so fall back to the
+    compiled code object's filename in that case instead.
+    """
+
+    try:
+        script_path = Path(__file__).resolve()
+    except NameError:
+        script_path = Path(inspect.getfile(inspect.currentframe())).resolve()
+
+    return script_path.parents[2]
+
+
+PROJECT_ROOT = resolve_project_root()
 
 CONFIG_PATH = PROJECT_ROOT / "config" / "etf_symbols.yml"
 
