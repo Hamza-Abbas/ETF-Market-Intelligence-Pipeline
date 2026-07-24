@@ -1,4 +1,3 @@
-
 # Name your project! Project names should contain only lowercase characters
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
@@ -31,10 +30,6 @@ clean-targets:         # directories to be removed by `dbt clean`
 # files using the `{{ config(...) }}` macro.
 models:
   etf_intelligence_pipeline:
-    bronze:
-      +schema: bronze
-      +materialized: table
-
     silver:
       +schema: silver
       +materialized: table
@@ -42,24 +37,3 @@ models:
     gold:
       +schema: gold
       +materialized: table
-
-
-seeds:
-  etf_intelligence_pipeline:
-    +schema: bronze
-    +quote_columns: false
-
-    etf_prices_incremental:
-      +column_types:
-        symbol: string
-        price_date: date
-        open: double
-        high: double
-        low: double
-        close: double
-        adjusted_close: double
-        volume: bigint
-        source_provider: string
-        load_type: string
-        batch_id: string
-        ingested_at_utc: timestamp

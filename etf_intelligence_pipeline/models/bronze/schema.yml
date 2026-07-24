@@ -1,44 +1,26 @@
 version: 2
 
-seeds:
-  - name: etf_prices_incremental
-    description: "Temporary landing batch containing the newest daily ETF prices."
+sources:
+  - name: bronze
+    catalog: etf_market_intelligence
+    schema: bronze
+    tables:
+      - name: etf_prices_raw
+        description: "Bronze Delta table containing historical and daily ETF prices, loaded directly by the Databricks ingestion job (fetch_incremental_prices.py)."
 
-    columns:
-      - name: symbol
-        data_tests:
-          - not_null
+        columns:
+          - name: symbol
+            data_tests:
+              - not_null
 
-      - name: price_date
-        data_tests:
-          - not_null
+          - name: price_date
+            data_tests:
+              - not_null
 
-      - name: adjusted_close
-        data_tests:
-          - not_null
+          - name: adjusted_close
+            data_tests:
+              - not_null
 
-      - name: volume
-        data_tests:
-          - not_null
-
-
-models:
-  - name: etf_prices_raw
-    description: "Incremental Bronze Delta table containing historical and daily ETF prices."
-
-    columns:
-      - name: symbol
-        data_tests:
-          - not_null
-
-      - name: price_date
-        data_tests:
-          - not_null
-
-      - name: adjusted_close
-        data_tests:
-          - not_null
-
-      - name: volume
-        data_tests:
-          - not_null
+          - name: volume
+            data_tests:
+              - not_null

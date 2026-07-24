@@ -14,7 +14,7 @@ WITH source AS (
         batch_id,
         ingested_at_utc,
         current_timestamp() AS silver_created_at_utc
-    FROM {{ ref('etf_prices_raw') }}
+    FROM {{ source('bronze', 'etf_prices_raw') }}
     WHERE symbol IS NOT NULL
       AND price_date IS NOT NULL
       AND adjusted_close IS NOT NULL
