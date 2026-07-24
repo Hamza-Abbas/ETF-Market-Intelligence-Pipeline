@@ -40,14 +40,19 @@ PROJECT_ROOT = resolve_project_root()
 
 CONFIG_PATH = PROJECT_ROOT / "config" / "etf_symbols.yml"
 
+# Git source checkouts in Databricks are read only, so anything this
+# script writes locally has to live outside PROJECT_ROOT. /tmp is
+# normal writable disk on the cluster node.
+LOCAL_SCRATCH_DIR = Path("/tmp/etf_intelligence_pipeline")
+
 BRONZE_DIR = (
-    PROJECT_ROOT
+    LOCAL_SCRATCH_DIR
     / "data"
     / "bronze"
     / "yahoo_finance"
 )
 
-LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR = LOCAL_SCRATCH_DIR / "logs"
 
 BRONZE_CATALOG = "etf_market_intelligence"
 BRONZE_SCHEMA = "bronze"
