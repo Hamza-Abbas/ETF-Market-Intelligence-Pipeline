@@ -5,6 +5,16 @@ from uuid import uuid4
 import pandas as pd
 import yfinance as yf
 from loguru import logger
+from pyspark.sql import SparkSession
+from pyspark.sql.types import (
+    DateType,
+    DoubleType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 
 from src.utils.config_loader import load_yaml_config
 
@@ -20,14 +30,43 @@ BRONZE_DIR = (
     / "yahoo_finance"
 )
 
-LANDING_SEED_PATH = (
-    PROJECT_ROOT
-    / "etf_intelligence_pipeline"
-    / "seeds"
-    / "etf_prices_incremental.csv"
-)
-
 LOG_DIR = PROJECT_ROOT / "logs"
+
+BRONZE_CATALOG = "etf_market_intelligence"
+BRONZE_SCHEMA = "bronze"
+BRONZE_TABLE = "etf_prices_raw"
+
+MERGE_COLUMNS = [
+    "symbol",
+    "price_date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "adjusted_close",
+    "volume",
+    "source_provider",
+    "load_type",
+    "batch_id",
+    "ingested_at_utc",
+]
+
+BRONZE_SCHEMA_STRUCT = StructType(
+    [
+        StructField("symbol", StringType(), False),
+        StructField("price_date", DateType(), False),
+        StructField("open", DoubleType(), False),
+        StructField("high", DoubleType(), False),
+        StructField("low", DoubleType(), False),
+        StructField("close", DoubleType(), False),
+        StructField("adjusted_close", DoubleType(), False),
+        StructField("volume", LongType(), False),
+        StructField("source_provider", StringType(), False),
+        StructField("load_type", StringType(), False),
+        StructField("batch_id", StringType(), False),
+        StructField("ingested_at_utc", TimestampType(), False),
+    ]
+)
 
 
 def setup_logger() -> None:
@@ -157,7 +196,12 @@ def save_local_bronze_copy(
     df: pd.DataFrame,
     symbol: str,
 ) -> None:
-    """Preserve the extracted daily record locally."""
+    """Preserve the extracted daily record on the cluster's local disk.
+
+    This is scratch space for debugging a single run, not a persistent
+    audit trail: when this task runs from a Git provider source, this
+    checkout (and this folder) does not survive past the run.
+    """
 
     price_date = str(df["price_date"].iloc[0])
 
@@ -176,8 +220,42 @@ def save_local_bronze_copy(
     logger.success(f"Saved {symbol} daily record to {output_path}")
 
 
+def merge_into_bronze(df: pd.DataFrame, spark: SparkSession) -> None:
+    """Merge the daily landing batch straight into the Bronze Delta table.
+
+    Runs on the Databricks cluster's own Spark session, so no external
+    connection details are needed here. Unity Catalog access comes from
+    the job's run as identity.
+    """
+
+    target_table = f"{BRONZE_CATALOG}.{BRONZE_SCHEMA}.{BRONZE_TABLE}"
+
+    typed_df = df[MERGE_COLUMNS].copy()
+    typed_df["ingested_at_utc"] = pd.to_datetime(typed_df["ingested_at_utc"])
+
+    spark_df = spark.createDataFrame(typed_df, schema=BRONZE_SCHEMA_STRUCT)
+    spark_df.createOrReplaceTempView("incremental_landing")
+
+    logger.info(f"Merging {df.shape[0]} rows into {target_table}")
+
+    spark.sql(
+        f"""
+        MERGE INTO {target_table} AS target
+        USING incremental_landing AS source
+        ON target.symbol = source.symbol
+           AND target.price_date = source.price_date
+        WHEN MATCHED THEN UPDATE SET *
+        WHEN NOT MATCHED THEN INSERT *
+        """
+    )
+
+    logger.success(f"Merged {df.shape[0]} rows into {target_table}")
+
+
 def main() -> None:
     setup_logger()
+
+    spark = SparkSession.builder.getOrCreate()
 
     config = load_yaml_config(CONFIG_PATH)
 
@@ -222,7 +300,7 @@ def main() -> None:
 
     if failed_symbols:
         raise RuntimeError(
-            "The landing seed was not updated because these symbols "
+            "Bronze was not updated because these symbols "
             f"failed: {failed_symbols}"
         )
 
@@ -249,17 +327,9 @@ def main() -> None:
         ["symbol", "price_date"]
     )
 
-    LANDING_SEED_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    merge_into_bronze(combined_df, spark)
 
-    combined_df.to_csv(
-        LANDING_SEED_PATH,
-        index=False,
-    )
-
-    print("\nLatest-day landing batch created successfully")
+    print("\nLatest-day batch merged into Bronze successfully")
     print(f"Batch ID: {batch_id}")
     print(f"Rows: {len(combined_df)}")
     print(f"Symbols: {combined_df['symbol'].nunique()}")
@@ -269,7 +339,7 @@ def main() -> None:
         f"{combined_df['price_date'].max()}"
     )
     print(f"Duplicate business keys: {duplicate_count}")
-    print(f"Landing seed: {LANDING_SEED_PATH}")
+    print(f"Bronze table: {BRONZE_CATALOG}.{BRONZE_SCHEMA}.{BRONZE_TABLE}")
 
 
 if __name__ == "__main__":
