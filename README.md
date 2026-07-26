@@ -6,7 +6,6 @@
 
 A data engineering portfolio project that pulls daily ETF prices from Yahoo Finance, lands them in Databricks, and builds them up through a Bronze, Silver, and Gold medallion architecture using dbt. The whole thing runs on a schedule inside a Databricks Job, no manual steps once it's set up.
 
-
 It tracks 20 USD listed ETFs spanning US, global, international, emerging market, technology, bond, and commodity exposure.
 
 **Where things stand:** the historical load, the Medallion layers, the dbt models and tests, and all five Gold marts are done. A Databricks Job runs daily: it pulls the latest prices straight into Bronze, then builds and tests Silver and Gold. Next up is a dashboard built natively in Databricks on top of the Gold marts, with its own refresh added as a third task in that same Job.
