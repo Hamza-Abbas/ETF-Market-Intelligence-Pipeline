@@ -4,7 +4,7 @@
 [![dbt](https://img.shields.io/badge/dbt%20Core-1.12-FF694B?logo=dbt&logoColor=white)](https://www.getdbt.com/)
 [![Databricks](https://img.shields.io/badge/Databricks-Delta%20Lake-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
 
-A data engineering portfolio project that pulls daily ETF prices from Yahoo Finance, lands them in Databricks, and builds them up through a Bronze, Silver, and Gold medallion layout using dbt. The whole thing runs on a schedule inside a Databricks Job, no manual steps once it's set up.
+A data engineering portfolio project that pulls daily ETF prices from Yahoo Finance, lands them in Databricks, and builds them up through a Bronze, Silver, and Gold medallion architecture using dbt. The whole thing runs on a schedule inside a Databricks Job, no manual steps once it's set up.
 
 It tracks 20 USD listed ETFs spanning US, global, international, emerging market, technology, bond, and commodity exposure.
 
