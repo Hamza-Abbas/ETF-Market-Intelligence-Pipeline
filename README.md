@@ -4,88 +4,110 @@
 [![dbt](https://img.shields.io/badge/dbt%20Core-1.12-FF694B?logo=dbt&logoColor=white)](https://www.getdbt.com/)
 [![Databricks](https://img.shields.io/badge/Databricks-Delta%20Lake-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
 
-A data engineering portfolio project that pulls daily ETF prices from Yahoo Finance, lands them in Databricks, and builds them up through a Bronze, Silver, and Gold medallion layout using dbt. The whole thing runs on a schedule inside a Databricks Job, no manual steps once it's set up.
+An automated ETF analytics pipeline that ingests daily market data from Yahoo Finance, stores it in Databricks Delta tables, transforms it through a Bronze–Silver–Gold Medallion Architecture with dbt, and refreshes a native Databricks financial dashboard.
 
-It tracks 20 USD listed ETFs spanning US, global, international, emerging market, technology, bond, and commodity exposure.
+The project tracks **20 USD-listed ETFs** across US equities, international markets, emerging markets, technology, bonds, and commodities.
 
-**Where things stand:** the historical load, the Medallion layers, the dbt models and tests, and all five Gold marts are done. A Databricks Job runs daily: it pulls the latest prices straight into Bronze, then builds and tests Silver and Gold. Next up is a dashboard built natively in Databricks on top of the Gold marts, with its own refresh added as a third task in that same Job.
+> **Current status:** the complete cloud workflow is operational. A scheduled Databricks Job fetches the latest ETF prices, merges them into Bronze, runs dbt transformations and tests for Silver and Gold, and refreshes the published dashboard as the final dependent task.
 
 ## Project Snapshot
 
-As of 24 July 2026, the first day the pipeline ran on its own without anyone triggering it:
+Operational status as of **30 July 2026**:
 
 | Metric | Value |
 | --- | ---: |
 | ETFs tracked | 20 |
-| Bronze price records | 58,100 |
-| Historical range | 2015-01-02 to 2026-07-23 |
-| Duplicate (symbol, price_date) keys | 0 |
+| Historical coverage | From 2015-01-02 |
+| Latest automated price date validated | 2026-07-29 |
+| Duplicate `(symbol, price_date)` keys | 0 |
 | dbt models | 6 |
 | dbt data tests | 82 |
 | Gold analytical marts | 5 |
+| Databricks Job tasks | 3 |
+| Dashboard pages | 3 |
 | Storage format | Delta |
 
-These numbers move every day now that the incremental load is automated, so treat this as a snapshot rather than a fixed count.
+The row count and latest date increase as new trading data is ingested.
 
 ## Why This Project Matters
 
-This project is meant to show what a real data engineering workflow looks like end to end, not just the SQL. A few things it covers:
+This project demonstrates an end-to-end Data Engineering workflow rather than only a dashboard or a collection of SQL queries:
 
-- Configuration driven ingestion in Python, so adding a new ETF is a one line config change, not a code change.
-- A historical bootstrap kept separate from the daily incremental load, each with its own script.
-- Idempotent loads: the daily job merges into Delta directly from Spark, so running it twice never doubles anything up.
-- A scheduled Databricks Job with real dependencies between its tasks.
-- A proper Medallion layout in Databricks, with dbt sources, models, and tests doing the transformation work.
-- Data quality enforced at the table level, not just checked by eye.
-- Full lineage on every row, batch IDs and ingestion timestamps carried all the way through.
+- Configuration-driven Python ingestion for a 20-ETF universe.
+- Separate historical bootstrap and daily incremental ingestion paths.
+- Idempotent Spark `MERGE` logic that prevents duplicate daily records.
+- Cloud execution without requiring a local machine to remain online.
+- Git-backed Python and dbt code used by Databricks Jobs.
+- Bronze, Silver, and Gold layers implemented on Delta tables.
+- dbt transformations, source definitions, data tests, and custom SQL tests.
+- Task dependencies that stop downstream processing after upstream failure.
+- A published Databricks dashboard refreshed automatically after Gold models finish.
+- Dynamic data-freshness indicators and parameterized ETF comparisons.
+- An exported `.lvdash.json` dashboard definition stored in Git for reproducibility.
 
 ## Architecture
 
 ```mermaid
-flowchart TD
-    A[Yahoo Finance] --> B[Python ingestion on a Databricks Job cluster]
-    B --> C[(Bronze Delta, merged via Spark)]
-    C --> D[(dbt Silver)]
-    D --> E[(dbt Gold marts)]
-    E --> F[Databricks SQL Warehouse]
+flowchart LR
+    A[Yahoo Finance] --> B[Databricks Job<br/>Python + Spark ingestion]
+    B --> C[(Bronze Delta<br/>etf_prices_raw)]
+    C --> D[dbt build]
+    D --> E[(Silver Delta<br/>clean daily prices)]
+    E --> F[(Gold marts<br/>performance and seasonality)]
+    F --> G[Databricks SQL Warehouse]
+    G --> H[Published Databricks Dashboard]
+    D -->|on success| I[Dashboard refresh task]
+    I --> H
 ```
+
+## Ingestion Design
 
 ### Historical Bootstrap
 
-`fetch_historical_prices.py` pulls the full daily history for every ETF back to 2015 and merges it straight into Bronze, the same way the daily job does. No local CSV, no seed file, just a Spark merge running inside a Databricks Job task. This is what built the original Bronze baseline, and because the merge is idempotent, it also doubles as a repair tool: if the daily job ever misses a day or fails outright, running this script again backfills whatever's missing without creating duplicates.
+`fetch_historical_prices.py` downloads the historical daily OHLCV data for each configured ETF from 2015 onward and loads it into Bronze through an idempotent Spark merge.
 
 ```text
-yfinance historical download (per ETF, from 2015)
-        → pandas batch in memory
-        → Spark DataFrame (temp view)
+Yahoo Finance historical download
+        → pandas batch
+        → Spark DataFrame
+        → temporary view
         → MERGE INTO bronze.etf_prices_raw
 ```
+
+The script can also serve as a recovery or backfill mechanism because rerunning the same dates updates matching keys rather than inserting duplicates.
 
 ### Daily Incremental Load
 
-Each day, the pipeline asks for just the newest candle per ETF and merges that small batch into Bronze. There's no landing file involved anywhere in this path.
+The scheduled incremental task retrieves the newest daily records and merges them directly into Bronze.
 
 ```text
 Latest daily ETF records
-        → pandas batch in memory
-        → Spark DataFrame (temp view)
-        → MERGE INTO bronze.etf_prices_raw
-        → dbt build: Silver and Gold
+        → pandas batch
+        → Spark DataFrame
+        → MERGE on symbol + price_date
+        → dbt Silver and Gold build
+        → dashboard refresh
 ```
 
-The merge matches on symbol and price_date. Run it twice for the same day and the second run just updates the existing rows instead of duplicating them. `etf_prices_raw` is defined as a dbt source rather than a dbt model, since the Job populates it directly. Silver reads it with `{{ source('bronze', 'etf_prices_raw') }}`.
+`bronze.etf_prices_raw` is declared as a dbt source because it is populated by the ingestion task rather than built as a dbt model.
 
-### Daily Orchestration
+## Daily Orchestration
 
-One Databricks Job, `etf_daily_pipeline`, runs the whole thing:
+One Databricks Job, `etf_daily_pipeline`, manages the complete dependency chain:
 
-| Task | Type | What it does | Status |
-| --- | --- | --- | --- |
-| `fetch_incremental_prices` | Python script (Git source) | Pulls the latest daily candle for all 20 ETFs and merges into Bronze | Live |
-| `build_silver_gold` | dbt | Runs `dbt build --select silver gold`, depends on the fetch task | Live |
-| refresh dashboard | Databricks dashboard refresh | Refreshes the native dashboard once Gold is rebuilt | Planned |
+| Order | Task | Type | Responsibility | Status |
+| ---: | --- | --- | --- | --- |
+| 1 | `fetch_incremental_prices` | Python script from Git | Fetch the latest records for all 20 ETFs and merge them into Bronze | Live |
+| 2 | `build_silver_gold` | dbt task | Run Silver and Gold transformations and tests after ingestion succeeds | Live |
+| 3 | `refresh_etf_dashboard` | Dashboard task | Refresh the published dashboard after the dbt task succeeds | Live |
 
-Both live tasks pull the current `main` branch fresh on every run, so a push to GitHub is all it takes to change what runs next. The third task gets added once the dashboard itself is built.
+```mermaid
+flowchart LR
+    A[fetch_incremental_prices] --> B[build_silver_gold]
+    B --> C[refresh_etf_dashboard]
+```
+
+The job runs in Databricks, so the pipeline does not depend on a personal laptop or a local scheduler.
 
 ## Medallion Architecture
 
@@ -93,44 +115,104 @@ Both live tasks pull the current `main` branch fresh on every run, so a push to 
 | --- | --- | --- |
 | Bronze | Preserve source values and ingestion metadata at daily ETF grain | `bronze.etf_prices_raw` |
 | Silver | Clean, standardize, validate, and calculate daily price movements | `silver.etf_prices_cleaned` |
-| Gold | Publish business ready performance, market, risk, and alert datasets | Five analytical marts |
-| Serving | Query curated Gold data through Databricks SQL | Databricks SQL Warehouse |
+| Gold | Publish business-ready performance, market, risk, and alert datasets | Five analytical marts |
+| Serving | Query curated Gold data and deliver interactive analytics | Databricks SQL + Dashboard |
 
 ### Bronze Layer
 
-The Bronze Delta table keeps the original market fields alongside operational metadata:
+The Bronze table stores source market fields and operational metadata:
 
 ```text
 symbol, price_date, open, high, low, close, adjusted_close, volume,
 source_provider, load_type, batch_id, ingested_at_utc
 ```
 
-Grain: one row per ETF per trading date.
+**Grain:** one row per ETF per trading date.
 
 ### Silver Layer
 
-`silver.etf_prices_cleaned` standardizes the raw field names, drops records missing required fields, and rejects rows where high comes in lower than low. It also adds a few calculated columns: the previous adjusted close, daily return and return percentage, and a five day adjusted close comparison. Source and batch lineage carry through, so a Silver row can always be traced back to where it came from in Bronze.
+`silver.etf_prices_cleaned`:
+
+- Standardizes source field names.
+- Filters records missing mandatory values.
+- Rejects invalid price ranges where `high < low`.
+- Calculates previous adjusted close.
+- Calculates daily return and daily return percentage.
+- Adds five-day comparison fields.
+- Preserves ingestion lineage and batch metadata.
 
 ### Gold Analytical Marts
 
 | Model | Grain | Business purpose |
 | --- | --- | --- |
-| `etf_long_term_performance` | One row per ETF | First and latest prices, total return since 2015 |
-| `etf_month_by_month_performance` | One row per ETF per month | Monthly movement, return, and trading day count |
-| `etf_monthly_market_summary` | One row per month | Market breadth, average return, and monthly leaders |
-| `etf_risk_summary` | One row per ETF | Volatility, positive month ratio, return to risk |
-| `etf_alert_candidates` | One row per qualifying ETF/month | Strong gains, sharp drops, momentum events |
+| `etf_long_term_performance` | One row per ETF | First and latest prices and total return since 2015 |
+| `etf_month_by_month_performance` | One row per ETF per month | Monthly return and trading-period metrics |
+| `etf_monthly_market_summary` | One row per month | Market breadth, average return, leaders, and laggards |
+| `etf_risk_summary` | One row per ETF | Volatility, positive-month ratio, and return-to-risk metrics |
+| `etf_alert_candidates` | One row per qualifying ETF/month | Strong gains, sharp drops, and momentum signals |
 
 Alert thresholds:
 
 | Monthly return | Alert type | Severity |
 | ---: | --- | :---: |
-| >= 8% | STRONG_GAIN | High |
-| <= -8% | SHARP_DROP | High |
-| >= 4% | POSITIVE_MOMENTUM | Medium |
-| <= -4% | NEGATIVE_MOMENTUM | Medium |
+| `>= 8%` | `STRONG_GAIN` | High |
+| `<= -8%` | `SHARP_DROP` | High |
+| `>= 4%` | `POSITIVE_MOMENTUM` | Medium |
+| `<= -4%` | `NEGATIVE_MOMENTUM` | Medium |
 
-The alert mart is ready for a dashboard to surface. Email delivery on top of it is a later phase.
+The dashboard currently focuses on performance and seasonality; the risk and alert marts remain available for later expansion.
+
+## Databricks Financial Dashboard
+
+The native Databricks dashboard is published and refreshed as the final task in the daily pipeline.
+
+### 1. Overview
+
+The landing page presents:
+
+- Latest completed reporting month.
+- Latest available daily price date.
+- Number of ETFs tracked.
+- Market average monthly return.
+- Positive ETF ratio.
+- Best and worst monthly performers.
+- Ranked latest-month ETF returns.
+
+![ETF Market Intelligence Overview](docs/dashboard/overview.png)
+
+### 2. Performance & Comparison
+
+The performance page supports:
+
+- Dynamic horizons: `1M`, `3M`, `6M`, `YTD`, `1Y`, `3Y`, `5Y`, and `MAX`.
+- ETF return ranking for the selected horizon.
+- Multi-select ETF comparison.
+- Normalized growth from a common starting value of 100.
+- Compounded period-return calculations.
+
+![ETF Performance and Comparison](docs/dashboard/performance-comparison.png)
+
+### 3. Seasonality
+
+The seasonality page presents:
+
+- Highest average calendar month.
+- Lowest average calendar month.
+- Most frequently positive calendar month.
+- ETF-by-month return heatmap.
+- Current month-to-date data in the seasonality calculations.
+
+![ETF Seasonality](docs/dashboard/seasonality.png)
+
+### Dashboard as Code
+
+The exported Databricks dashboard definition is versioned here:
+
+```text
+databricks/dashboards/etf_market_intelligence.lvdash.json
+```
+
+The export contains the dashboard pages, SQL datasets, parameters, filters, widget layouts, conditional formatting, and saved defaults. It does not contain the underlying market data or Databricks credentials.
 
 ## ETF Universe
 
@@ -157,7 +239,7 @@ The alert mart is ready for a dashboard to surface. Email delivery on top of it 
 | EWU | iShares MSCI United Kingdom ETF |
 | EWZ | iShares MSCI Brazil ETF |
 
-Symbols live in `config/etf_symbols.yml`. Names and classifications live in `config/etf_metadata.yml`.
+Symbols are maintained in `config/etf_symbols.yml`. ETF names and classifications are maintained in `config/etf_metadata.yml`.
 
 ## Repository Structure
 
@@ -166,22 +248,27 @@ daily_etf_market_intelligence_pipeline/
 ├── config/
 │   ├── etf_symbols.yml
 │   └── etf_metadata.yml
-├── data/                              # Generated locally; excluded from Git
-│   ├── bootstrap/
-│   └── bronze/
+├── databricks/
+│   └── dashboards/
+│       └── etf_market_intelligence.lvdash.json
+├── docs/
+│   └── dashboard/
+│       ├── overview.png
+│       ├── performance-comparison.png
+│       └── seasonality.png
 ├── etf_intelligence_pipeline/
 │   ├── dbt_project.yml
 │   ├── macros/
 │   ├── models/
 │   │   ├── bronze/
-│   │   │   └── schema.yml             # Declares bronze.etf_prices_raw as a source
+│   │   │   └── schema.yml
 │   │   ├── silver/
 │   │   └── gold/
 │   └── tests/
 ├── src/
 │   ├── ingestion/
-│   │   ├── fetch_historical_prices.py  # Databricks Job task; also doubles as a recovery tool
-│   │   ├── fetch_incremental_prices.py # Databricks Job task, merges straight into Bronze
+│   │   ├── fetch_historical_prices.py
+│   │   ├── fetch_incremental_prices.py
 │   │   ├── check_bronze_files.py
 │   │   └── create_databricks_upload_file.py
 │   └── utils/
@@ -192,16 +279,18 @@ daily_etf_market_intelligence_pipeline/
 └── README.md
 ```
 
+Generated data, local environments, logs, dbt build artifacts, and credentials are excluded from version control.
+
 ## Local Setup
 
-The daily ingestion runs on Databricks, not your machine, see Daily Orchestration above. What's local is for developing and testing dbt models.
+The scheduled pipeline executes in Databricks. Local setup is mainly used for developing and validating dbt models.
 
 ### Prerequisites
 
 - Python 3.11 or newer
 - [`uv`](https://docs.astral.sh/uv/)
 - Git
-- A Databricks workspace and SQL Warehouse
+- Databricks workspace and SQL Warehouse
 - dbt Core and `dbt-databricks`
 
 ### 1. Clone and install
@@ -214,7 +303,7 @@ uv sync
 
 ### 2. Configure dbt
 
-Store the Databricks connection in `%USERPROFILE%\.dbt\profiles.yml`. Keep secrets out of the repository, and reference environment variables where you can.
+Store the Databricks connection in `%USERPROFILE%\.dbt\profiles.yml`. Do not commit access tokens or connection secrets.
 
 Validate the connection:
 
@@ -226,13 +315,13 @@ cd ..
 
 ## Running the Pipeline
 
-### Automated (production)
+### Automated cloud workflow
 
-The `etf_daily_pipeline` Databricks Job handles this on its own schedule, see Daily Orchestration above. Nothing to run manually, check the Job's run history in Databricks if you want to confirm it fired.
+The scheduled `etf_daily_pipeline` Databricks Job handles ingestion, transformation, testing, and dashboard refresh automatically.
+
+Check the Databricks Job run history to inspect task status, duration, and failures.
 
 ### Local dbt development
-
-The ingestion scripts need a live Spark session and only run as Databricks Job tasks, they won't run on your laptop. Silver and Gold still build and test locally against your `profiles.yml`, same as always:
 
 ```powershell
 cd .\etf_intelligence_pipeline
@@ -240,11 +329,21 @@ dbt build --select silver gold
 cd ..
 ```
 
+The Spark ingestion scripts are intended to run as Databricks Job tasks rather than as a local production scheduler.
+
 ## Data Quality
 
-82 dbt data tests, plus a handful of custom SQL checks, cover what actually matters here: required fields aren't null, `(symbol, price_date)` stays unique in Bronze and Silver, invalid price ranges get rejected, grains hold steady through Silver and Gold, and a daily batch always has to contain every configured ETF before it's allowed to load.
+The project uses **82 dbt data tests** and custom SQL checks covering:
 
-Bronze row count and date range:
+- Mandatory fields.
+- Unique `(symbol, price_date)` grain.
+- Valid OHLC price relationships.
+- Stable grains through Silver and Gold.
+- Complete configured ETF batches.
+- Null handling in analytical metrics.
+- Source-to-model consistency.
+
+Bronze validation:
 
 ```sql
 SELECT
@@ -255,7 +354,7 @@ SELECT
 FROM etf_market_intelligence.bronze.etf_prices_raw;
 ```
 
-Duplicate key check:
+Duplicate-key validation:
 
 ```sql
 SELECT
@@ -269,9 +368,18 @@ HAVING COUNT(*) > 1;
 
 ## Security
 
-Nothing here gets committed: `.env`, `%USERPROFILE%\.dbt\profiles.yml`, `.venv/`, `logs/`, dbt's `target/` and `dbt_packages/`, and any generated Bronze or bootstrap CSVs.
+The following are excluded from Git:
 
-Before pushing, it's worth a quick look at what's actually staged:
+- `.env`
+- `%USERPROFILE%\.dbt\profiles.yml`
+- `.venv/`
+- Logs
+- dbt `target/`
+- `dbt_packages/`
+- Generated local market-data files
+- Databricks access tokens
+
+Before every push:
 
 ```powershell
 git status --short
@@ -279,53 +387,71 @@ git diff
 git diff --cached
 ```
 
-## Where Things Stand
+## Project Status
 
 | Capability | Status |
 | --- | --- |
 | Historical ingestion for 20 ETFs | Done |
-| Bronze Delta baseline, growing daily | Done |
+| Bronze Delta baseline and daily growth | Done |
 | Silver transformation layer | Done |
 | Five Gold analytical marts | Done |
 | dbt tests on Silver and Gold | Done |
-| Full ETF names and classifications | Done |
-| Daily extractor, merges straight into Bronze via Spark | Done |
-| Bronze as a dbt source, no seed step | Done |
-| Databricks Job: fetch, then build Silver and Gold | Done |
-| Daily schedule | Done |
-| Native Databricks dashboard on the Gold marts | Next |
-| Dashboard refresh as a third Job task | Next |
-| Gmail success and failure notifications | Later |
-| Public deployment | Later |
+| Full ETF metadata and classifications | Done |
+| Idempotent Spark incremental ingestion | Done |
+| Git-backed Databricks Job execution | Done |
+| Daily cloud schedule | Done |
+| Published three-page Databricks dashboard | Done |
+| Dashboard refresh as third Job task | Done |
+| Dashboard definition exported to Git | Done |
+| Gmail success and failure notifications | Planned |
+| Structured operational observability | Planned |
+| Public dashboard deployment | Future enhancement |
 
 ## Roadmap
 
-### Phase 1 — Automated Daily Pipeline (done)
+### Phase 1 — Core Medallion Pipeline ✅
 
-- Validate the daily extraction and Delta merge end to end.
-- Run ingestion and dbt through one Databricks Job, `etf_daily_pipeline`.
-- Schedule the Job to run daily without anyone touching it.
+- Historical ETF ingestion.
+- Bronze, Silver, and Gold Delta layers.
+- dbt models, sources, tests, and Gold marts.
 
-### Phase 2 — Dashboard and Observability
+### Phase 2 — Cloud Automation ✅
 
-- Build a dashboard natively in Databricks on top of the Gold marts.
-- Add that dashboard's refresh as a third task in the daily Job.
-- Add structured run logs, freshness checks, and failure monitoring.
-- Report success, no new data, and failure outcomes through Gmail.
-- Avoid repeat notifications for alerts already sent once.
+- Databricks Git integration.
+- Spark incremental ingestion.
+- Scheduled Databricks Job.
+- Dependent dbt build task.
 
-### Phase 3 — Analytics Expansion
+### Phase 3 — Financial Dashboard ✅
 
-- Add dashboard and dbt lineage screenshots to this README.
-- Extend the analytics with drawdown, annualized volatility, volume, and rolling return views.
+- Native Databricks dashboard.
+- Overview, Performance & Comparison, and Seasonality pages.
+- Parameterized horizon and ETF filters.
+- Automated dashboard refresh task.
+- Dashboard screenshots and `.lvdash.json` export.
+
+### Phase 4 — Observability and Notifications
+
+- Structured pipeline-run metrics.
+- Data-freshness and row-count alerts.
+- Success and failure notifications.
+- Notification deduplication.
+
+### Phase 5 — Analytics Expansion
+
+- Drawdown analysis.
+- Annualized volatility.
+- Rolling returns.
+- Trading-volume analytics.
+- Expanded alert and risk views.
 
 ## Author
 
-**Hamza Abbas** — Aspiring Data Engineer focused on Python, SQL, dbt, Databricks, Snowflake, cloud data platforms, and analytics engineering.
+**Hamza Abbas** — Aspiring Data Engineer focused on Python, SQL, dbt, Databricks, Snowflake, cloud data platforms, and Analytics Engineering.
 
 - [LinkedIn](https://www.linkedin.com/in/hamza-abbas-data-engineer/)
 - [GitHub](https://github.com/Hamza-Abbas)
 
 ## Disclaimer
 
-This project is built for educational and data engineering portfolio purposes. It isn't financial advice, investment research, or a recommendation to buy or sell any security.
+This project is built for educational and Data Engineering portfolio purposes. It is not financial advice, investment research, or a recommendation to buy or sell any security.

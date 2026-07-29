@@ -1,0 +1,2271 @@
+{
+  "datasets": [
+    {
+      "name": "306dffd2",
+      "displayName": "long_term_performance",
+      "queryLines": [
+        "SELECT\r\n",
+        "    p.symbol,\r\n",
+        "    m.etf_name,\r\n",
+        "    m.asset_class,\r\n",
+        "    p.total_return_pct\r\n",
+        "FROM gold.etf_long_term_performance p\r\n",
+        "JOIN reference.etf_metadata m ON p.symbol = m.symbol\r\n",
+        "ORDER BY p.total_return_pct DESC;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "e31054f2",
+      "displayName": "market_summary",
+      "queryLines": [
+        "SELECT\r\n",
+        "    month_start_date,\r\n",
+        "    avg_monthly_return_pct,\r\n",
+        "    best_performing_etf,\r\n",
+        "    worst_performing_etf,\r\n",
+        "    positive_etf_ratio_pct\r\n",
+        "FROM gold.etf_monthly_market_summary\r\n",
+        "ORDER BY month_start_date;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "e316b200",
+      "displayName": "seasonality_overall",
+      "queryLines": [
+        "SELECT\r\n",
+        "    MONTH(month_start_date) AS calendar_month,\r\n",
+        "    ROUND(AVG(monthly_return_pct), 2) AS avg_return_pct\r\n",
+        "FROM gold.etf_month_by_month_performance\r\n",
+        "GROUP BY MONTH(month_start_date)\r\n",
+        "ORDER BY calendar_month;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "90ee599e",
+      "displayName": "seasonality_by_symbol",
+      "queryLines": [
+        "SELECT\r\n",
+        "    p.symbol,\r\n",
+        "    COALESCE(m.etf_name, p.symbol) AS etf_name,\r\n",
+        "\r\n",
+        "    MONTH(p.month_start_date) AS calendar_month,\r\n",
+        "\r\n",
+        "    CONCAT(\r\n",
+        "        LPAD(MONTH(p.month_start_date), 2, '0'),\r\n",
+        "        ' ',\r\n",
+        "        DATE_FORMAT(\r\n",
+        "            MAKE_DATE(\r\n",
+        "                2000,\r\n",
+        "                MONTH(p.month_start_date),\r\n",
+        "                1\r\n",
+        "            ),\r\n",
+        "            'MMM'\r\n",
+        "        )\r\n",
+        "    ) AS month_label,\r\n",
+        "\r\n",
+        "    ROUND(\r\n",
+        "        AVG(p.monthly_return_pct),\r\n",
+        "        2\r\n",
+        "    ) AS avg_monthly_return_pct\r\n",
+        "\r\n",
+        "FROM gold.etf_month_by_month_performance p\r\n",
+        "\r\n",
+        "LEFT JOIN reference.etf_metadata m\r\n",
+        "    ON p.symbol = m.symbol\r\n",
+        "\r\n",
+        "WHERE p.monthly_return_pct IS NOT NULL\r\n",
+        "\r\n",
+        "GROUP BY\r\n",
+        "    p.symbol,\r\n",
+        "    m.etf_name,\r\n",
+        "    MONTH(p.month_start_date)\r\n",
+        "\r\n",
+        "ORDER BY\r\n",
+        "    p.symbol,\r\n",
+        "    calendar_month;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "1923f847",
+      "displayName": "explorer_best_months",
+      "queryLines": [
+        "SELECT\r\n",
+        "    month_start_date,\r\n",
+        "    monthly_return_pct,\r\n",
+        "    RANK() OVER (ORDER BY monthly_return_pct DESC) AS rank\r\n",
+        "FROM gold.etf_month_by_month_performance\r\n",
+        "WHERE symbol = :symbol\r\n",
+        "ORDER BY monthly_return_pct DESC\r\n",
+        "LIMIT 5;"
+      ],
+      "parameters": [
+        {
+          "displayName": "symbol",
+          "keyword": "symbol",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "VOO"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "5171f2f9",
+      "displayName": "explorer_worst_months",
+      "queryLines": [
+        "SELECT\r\n",
+        "    month_start_date,\r\n",
+        "    monthly_return_pct,\r\n",
+        "    RANK() OVER (ORDER BY monthly_return_pct ASC) AS rank\r\n",
+        "FROM gold.etf_month_by_month_performance\r\n",
+        "WHERE symbol = :symbol\r\n",
+        "ORDER BY monthly_return_pct ASC\r\n",
+        "LIMIT 5;"
+      ],
+      "parameters": [
+        {
+          "displayName": "symbol",
+          "keyword": "symbol",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "VOO"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "c62a05bb",
+      "displayName": "symbol_list",
+      "queryLines": [
+        "SELECT DISTINCT symbol\r\n",
+        "FROM reference.etf_metadata\r\n",
+        "ORDER BY symbol;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "reference"
+    },
+    {
+      "name": "6413c1c0",
+      "displayName": "alerts",
+      "queryLines": [
+        "SELECT\r\n",
+        "    a.symbol,\r\n",
+        "    m.etf_name,\r\n",
+        "    a.month_start_date,\r\n",
+        "    a.monthly_return_pct,\r\n",
+        "    a.alert_type,\r\n",
+        "    a.alert_severity,\r\n",
+        "    a.alert_message\r\n",
+        "FROM gold.etf_alert_candidates a\r\n",
+        "JOIN reference.etf_metadata m ON a.symbol = m.symbol\r\n",
+        "ORDER BY a.month_start_date DESC;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "069fcab7",
+      "displayName": "alerts_summary",
+      "queryLines": [
+        "SELECT alert_type, alert_severity, COUNT(*) AS occurrences\r\n",
+        "FROM gold.etf_alert_candidates\r\n",
+        "GROUP BY alert_type, alert_severity\r\n",
+        "ORDER BY occurrences DESC;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "8386a00d",
+      "displayName": "overview_kpis",
+      "queryLines": [
+        "WITH completed_monthly_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        month_start_date,\r\n",
+        "        monthly_return_pct\r\n",
+        "    FROM gold.etf_month_by_month_performance\r\n",
+        "    WHERE month_start_date <\r\n",
+        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "      AND monthly_return_pct IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "latest_reporting_month AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        MAX(month_start_date) AS reporting_month\r\n",
+        "    FROM completed_monthly_returns\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "latest_price AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        MAX(price_date) AS latest_price_date\r\n",
+        "    FROM silver.etf_prices_cleaned\r\n",
+        "),\r\n",
+        "\r\n",
+        "latest_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        r.symbol,\r\n",
+        "        r.month_start_date,\r\n",
+        "        r.monthly_return_pct\r\n",
+        "    FROM completed_monthly_returns r\r\n",
+        "    INNER JOIN latest_reporting_month lm\r\n",
+        "        ON r.month_start_date = lm.reporting_month\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "market_statistics AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        COUNT(DISTINCT symbol) AS etfs_tracked,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            AVG(monthly_return_pct),\r\n",
+        "            2\r\n",
+        "        ) AS avg_monthly_return_pct,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            100.0\r\n",
+        "            * SUM(\r\n",
+        "                CASE\r\n",
+        "                    WHEN monthly_return_pct > 0 THEN 1\r\n",
+        "                    ELSE 0\r\n",
+        "                END\r\n",
+        "            )\r\n",
+        "            / COUNT(*),\r\n",
+        "            1\r\n",
+        "        ) AS positive_etf_ratio_pct\r\n",
+        "\r\n",
+        "    FROM latest_returns\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "best_etf AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        r.symbol AS best_symbol,\r\n",
+        "        COALESCE(m.etf_name, r.symbol) AS best_etf_name,\r\n",
+        "        ROUND(r.monthly_return_pct, 2) AS best_return_pct\r\n",
+        "    FROM latest_returns r\r\n",
+        "    LEFT JOIN reference.etf_metadata m\r\n",
+        "        ON r.symbol = m.symbol\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        ORDER BY\r\n",
+        "            r.monthly_return_pct DESC,\r\n",
+        "            r.symbol\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "worst_etf AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        r.symbol AS worst_symbol,\r\n",
+        "        COALESCE(m.etf_name, r.symbol) AS worst_etf_name,\r\n",
+        "        ROUND(r.monthly_return_pct, 2) AS worst_return_pct\r\n",
+        "    FROM latest_returns r\r\n",
+        "    LEFT JOIN reference.etf_metadata m\r\n",
+        "        ON r.symbol = m.symbol\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        ORDER BY\r\n",
+        "            r.monthly_return_pct ASC,\r\n",
+        "            r.symbol\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    lm.reporting_month,\r\n",
+        "    DATE_FORMAT(\r\n",
+        "    lm.reporting_month,\r\n",
+        "    'MMMM yyyy'\r\n",
+        ") AS reporting_month_label,\r\n",
+        "    DATE_FORMAT(\r\n",
+        "    lp.latest_price_date,\r\n",
+        "    'MMMM d, yyyy'\r\n",
+        ") AS latest_price_date_label, \r\n",
+        "    ms.etfs_tracked,\r\n",
+        "    ms.avg_monthly_return_pct,\r\n",
+        "    ms.positive_etf_ratio_pct,\r\n",
+        "\r\n",
+        "    b.best_symbol,\r\n",
+        "    b.best_etf_name,\r\n",
+        "    b.best_return_pct,\r\n",
+        "\r\n",
+        "    w.worst_symbol,\r\n",
+        "    w.worst_etf_name,\r\n",
+        "    w.worst_return_pct,\r\n",
+        "\r\n",
+        "    1 AS header_display_value\r\n",
+        "\r\n",
+        "FROM latest_reporting_month lm\r\n",
+        "CROSS JOIN market_statistics ms\r\n",
+        "CROSS JOIN best_etf b\r\n",
+        "CROSS JOIN worst_etf w\r\n",
+        "CROSS JOIN latest_price lp;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "0d5d8b46",
+      "displayName": "latest_month_return_rankings",
+      "queryLines": [
+        "WITH completed_monthly_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        month_start_date,\r\n",
+        "        monthly_return_pct\r\n",
+        "    FROM gold.etf_month_by_month_performance\r\n",
+        "    WHERE month_start_date <\r\n",
+        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "      AND monthly_return_pct IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "latest_reporting_month AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        MAX(month_start_date) AS reporting_month\r\n",
+        "    FROM completed_monthly_returns\r\n",
+        "\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    r.symbol,\r\n",
+        "    COALESCE(m.etf_name, r.symbol) AS etf_name,\r\n",
+        "    m.asset_class,\r\n",
+        "    m.region,\r\n",
+        "    r.month_start_date AS reporting_month,\r\n",
+        "    ROUND(r.monthly_return_pct, 2) AS monthly_return_pct\r\n",
+        "\r\n",
+        "FROM completed_monthly_returns r\r\n",
+        "\r\n",
+        "INNER JOIN latest_reporting_month lm\r\n",
+        "    ON r.month_start_date = lm.reporting_month\r\n",
+        "\r\n",
+        "LEFT JOIN reference.etf_metadata m\r\n",
+        "    ON r.symbol = m.symbol\r\n",
+        "\r\n",
+        "ORDER BY\r\n",
+        "    r.monthly_return_pct DESC,\r\n",
+        "    r.symbol;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "fcd56975",
+      "displayName": "performance_period_options",
+      "queryLines": [
+        "SELECT *\r\n",
+        "FROM VALUES\r\n",
+        "    ('1M', 1),\r\n",
+        "    ('3M', 2),\r\n",
+        "    ('6M', 3),\r\n",
+        "    ('YTD', 4),\r\n",
+        "    ('1Y', 5),\r\n",
+        "    ('3Y', 6),\r\n",
+        "    ('5Y', 7),\r\n",
+        "    ('MAX', 8)\r\n",
+        "AS periods(time_horizon, sort_order)\r\n",
+        "\r\n",
+        "ORDER BY sort_order;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "f40a0bc2",
+      "displayName": "period_performance",
+      "queryLines": [
+        "WITH parameter_value AS (\r\n",
+        "\r\n",
+        "    SELECT UPPER(:time_horizon) AS time_horizon\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "latest_completed_month AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        MAX(month_start_date) AS latest_month\r\n",
+        "\r\n",
+        "    FROM gold.etf_month_by_month_performance\r\n",
+        "\r\n",
+        "    WHERE month_start_date <\r\n",
+        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "period_configuration AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        p.time_horizon,\r\n",
+        "        l.latest_month,\r\n",
+        "\r\n",
+        "        CASE p.time_horizon\r\n",
+        "            WHEN '1M'\r\n",
+        "                THEN l.latest_month\r\n",
+        "\r\n",
+        "            WHEN '3M'\r\n",
+        "                THEN ADD_MONTHS(l.latest_month, -2)\r\n",
+        "\r\n",
+        "            WHEN '6M'\r\n",
+        "                THEN ADD_MONTHS(l.latest_month, -5)\r\n",
+        "\r\n",
+        "            WHEN 'YTD'\r\n",
+        "                THEN CAST(\r\n",
+        "                    DATE_TRUNC('YEAR', l.latest_month)\r\n",
+        "                    AS DATE\r\n",
+        "                )\r\n",
+        "\r\n",
+        "            WHEN '1Y'\r\n",
+        "                THEN ADD_MONTHS(l.latest_month, -11)\r\n",
+        "\r\n",
+        "            WHEN '3Y'\r\n",
+        "                THEN ADD_MONTHS(l.latest_month, -35)\r\n",
+        "\r\n",
+        "            WHEN '5Y'\r\n",
+        "                THEN ADD_MONTHS(l.latest_month, -59)\r\n",
+        "\r\n",
+        "            WHEN 'MAX'\r\n",
+        "                THEN DATE '1900-01-01'\r\n",
+        "        END AS required_start_month,\r\n",
+        "\r\n",
+        "        CASE p.time_horizon\r\n",
+        "            WHEN '1M' THEN 1\r\n",
+        "            WHEN '3M' THEN 3\r\n",
+        "            WHEN '6M' THEN 6\r\n",
+        "            WHEN 'YTD' THEN MONTH(l.latest_month)\r\n",
+        "            WHEN '1Y' THEN 12\r\n",
+        "            WHEN '3Y' THEN 36\r\n",
+        "            WHEN '5Y' THEN 60\r\n",
+        "            WHEN 'MAX' THEN NULL\r\n",
+        "        END AS expected_months\r\n",
+        "\r\n",
+        "    FROM parameter_value p\r\n",
+        "    CROSS JOIN latest_completed_month l\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "selected_monthly_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        p.symbol,\r\n",
+        "        p.month_start_date,\r\n",
+        "        p.monthly_return_pct,\r\n",
+        "        c.time_horizon,\r\n",
+        "        c.latest_month,\r\n",
+        "        c.expected_months\r\n",
+        "\r\n",
+        "    FROM gold.etf_month_by_month_performance p\r\n",
+        "    CROSS JOIN period_configuration c\r\n",
+        "\r\n",
+        "    WHERE p.month_start_date\r\n",
+        "              BETWEEN c.required_start_month\r\n",
+        "                  AND c.latest_month\r\n",
+        "\r\n",
+        "      AND p.monthly_return_pct IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "compounded_performance AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        time_horizon,\r\n",
+        "\r\n",
+        "        MIN(month_start_date) AS period_start_month,\r\n",
+        "        MAX(month_start_date) AS period_end_month,\r\n",
+        "\r\n",
+        "        COUNT(*) AS months_available,\r\n",
+        "        MAX(expected_months) AS expected_months,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            100 * (\r\n",
+        "                EXP(\r\n",
+        "                    SUM(\r\n",
+        "                        LN(\r\n",
+        "                            1 + monthly_return_pct / 100.0\r\n",
+        "                        )\r\n",
+        "                    )\r\n",
+        "                ) - 1\r\n",
+        "            ),\r\n",
+        "            2\r\n",
+        "        ) AS period_return_pct\r\n",
+        "\r\n",
+        "    FROM selected_monthly_returns\r\n",
+        "\r\n",
+        "    GROUP BY\r\n",
+        "        symbol,\r\n",
+        "        time_horizon\r\n",
+        "\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    p.symbol,\r\n",
+        "    COALESCE(m.etf_name, p.symbol) AS etf_name,\r\n",
+        "    m.asset_class,\r\n",
+        "    m.region,\r\n",
+        "    m.category,\r\n",
+        "\r\n",
+        "    p.time_horizon,\r\n",
+        "    p.period_start_month,\r\n",
+        "    p.period_end_month,\r\n",
+        "    p.months_available,\r\n",
+        "\r\n",
+        "    p.period_return_pct,\r\n",
+        "\r\n",
+        "    CASE\r\n",
+        "        WHEN p.period_return_pct >= 0 THEN 'Positive'\r\n",
+        "        ELSE 'Negative'\r\n",
+        "    END AS return_direction\r\n",
+        "\r\n",
+        "FROM compounded_performance p\r\n",
+        "\r\n",
+        "LEFT JOIN reference.etf_metadata m\r\n",
+        "    ON p.symbol = m.symbol\r\n",
+        "\r\n",
+        "WHERE p.time_horizon = 'MAX'\r\n",
+        "   OR p.months_available = p.expected_months\r\n",
+        "\r\n",
+        "ORDER BY\r\n",
+        "    p.period_return_pct DESC,\r\n",
+        "    p.symbol;"
+      ],
+      "parameters": [
+        {
+          "displayName": "time_horizon",
+          "keyword": "time_horizon",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "YTD"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "53aaa356",
+      "displayName": "normalized_performance",
+      "queryLines": [
+        "WITH parameter_value AS (\r\n",
+        "\r\n",
+        "    SELECT UPPER(:time_horizon) AS time_horizon\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "latest_completed_month AS (\r\n",
+        "\r\n",
+        "    SELECT MAX(month_start_date) AS latest_month\r\n",
+        "    FROM gold.etf_month_by_month_performance\r\n",
+        "    WHERE month_start_date <\r\n",
+        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "period_configuration AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        p.time_horizon,\r\n",
+        "        l.latest_month,\r\n",
+        "\r\n",
+        "        CASE p.time_horizon\r\n",
+        "            WHEN '1M'  THEN l.latest_month\r\n",
+        "            WHEN '3M'  THEN ADD_MONTHS(l.latest_month, -2)\r\n",
+        "            WHEN '6M'  THEN ADD_MONTHS(l.latest_month, -5)\r\n",
+        "            WHEN 'YTD' THEN CAST(DATE_TRUNC('YEAR', l.latest_month) AS DATE)\r\n",
+        "            WHEN '1Y'  THEN ADD_MONTHS(l.latest_month, -11)\r\n",
+        "            WHEN '3Y'  THEN ADD_MONTHS(l.latest_month, -35)\r\n",
+        "            WHEN '5Y'  THEN ADD_MONTHS(l.latest_month, -59)\r\n",
+        "            WHEN 'MAX' THEN DATE '1900-01-01'\r\n",
+        "        END AS return_start_month\r\n",
+        "\r\n",
+        "    FROM parameter_value p\r\n",
+        "    CROSS JOIN latest_completed_month l\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "selected_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        p.symbol,\r\n",
+        "        p.month_start_date,\r\n",
+        "        p.monthly_return_pct,\r\n",
+        "        c.time_horizon\r\n",
+        "\r\n",
+        "    FROM gold.etf_month_by_month_performance p\r\n",
+        "    CROSS JOIN period_configuration c\r\n",
+        "\r\n",
+        "    WHERE p.month_start_date\r\n",
+        "          BETWEEN c.return_start_month AND c.latest_month\r\n",
+        "\r\n",
+        "      AND p.monthly_return_pct IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "cumulative_growth AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        month_start_date,\r\n",
+        "        time_horizon,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            100 * EXP(\r\n",
+        "                SUM(\r\n",
+        "                    LN(1 + monthly_return_pct / 100.0)\r\n",
+        "                ) OVER (\r\n",
+        "                    PARTITION BY symbol\r\n",
+        "                    ORDER BY month_start_date\r\n",
+        "                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\r\n",
+        "                )\r\n",
+        "            ),\r\n",
+        "            2\r\n",
+        "        ) AS normalized_value\r\n",
+        "\r\n",
+        "    FROM selected_returns\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "starting_points AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        ADD_MONTHS(MIN(month_start_date), -1) AS month_start_date,\r\n",
+        "        MAX(time_horizon) AS time_horizon,\r\n",
+        "        100.00 AS normalized_value\r\n",
+        "\r\n",
+        "    FROM selected_returns\r\n",
+        "\r\n",
+        "    GROUP BY symbol\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "combined AS (\r\n",
+        "\r\n",
+        "    SELECT * FROM starting_points\r\n",
+        "    UNION ALL\r\n",
+        "    SELECT * FROM cumulative_growth\r\n",
+        "\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    c.symbol,\r\n",
+        "    COALESCE(m.etf_name, c.symbol) AS etf_name,\r\n",
+        "    c.month_start_date,\r\n",
+        "    c.time_horizon,\r\n",
+        "    c.normalized_value\r\n",
+        "\r\n",
+        "FROM combined c\r\n",
+        "\r\n",
+        "LEFT JOIN reference.etf_metadata m\r\n",
+        "    ON c.symbol = m.symbol\r\n",
+        "\r\n",
+        "ORDER BY\r\n",
+        "    c.symbol,\r\n",
+        "    c.month_start_date;"
+      ],
+      "parameters": [
+        {
+          "displayName": "time_horizon",
+          "keyword": "time_horizon",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "YTD"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "6d697d1c",
+      "displayName": "seasonality_kpis",
+      "queryLines": [
+        "WITH all_available_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        month_start_date,\r\n",
+        "        MONTH(month_start_date) AS calendar_month,\r\n",
+        "        monthly_return_pct\r\n",
+        "\r\n",
+        "    FROM gold.etf_month_by_month_performance\r\n",
+        "\r\n",
+        "    WHERE monthly_return_pct IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "monthly_statistics AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        calendar_month,\r\n",
+        "\r\n",
+        "        DATE_FORMAT(\r\n",
+        "            MAKE_DATE(2000, calendar_month, 1),\r\n",
+        "            'MMMM'\r\n",
+        "        ) AS month_name,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            AVG(monthly_return_pct),\r\n",
+        "            2\r\n",
+        "        ) AS avg_return_pct,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            100.0 * AVG(\r\n",
+        "                CASE\r\n",
+        "                    WHEN monthly_return_pct > 0 THEN 1.0\r\n",
+        "                    ELSE 0.0\r\n",
+        "                END\r\n",
+        "            ),\r\n",
+        "            1\r\n",
+        "        ) AS positive_ratio_pct,\r\n",
+        "\r\n",
+        "        COUNT(*) AS observations\r\n",
+        "\r\n",
+        "    FROM all_available_returns\r\n",
+        "\r\n",
+        "    GROUP BY calendar_month\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "strongest_month AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        calendar_month,\r\n",
+        "        month_name,\r\n",
+        "        avg_return_pct,\r\n",
+        "        positive_ratio_pct,\r\n",
+        "        observations\r\n",
+        "\r\n",
+        "    FROM monthly_statistics\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        ORDER BY\r\n",
+        "            avg_return_pct DESC,\r\n",
+        "            calendar_month\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "weakest_month AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        calendar_month,\r\n",
+        "        month_name,\r\n",
+        "        avg_return_pct,\r\n",
+        "        positive_ratio_pct,\r\n",
+        "        observations\r\n",
+        "\r\n",
+        "    FROM monthly_statistics\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        ORDER BY\r\n",
+        "            avg_return_pct ASC,\r\n",
+        "            calendar_month\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "most_consistent_month AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        calendar_month,\r\n",
+        "        month_name,\r\n",
+        "        avg_return_pct,\r\n",
+        "        positive_ratio_pct,\r\n",
+        "        observations\r\n",
+        "\r\n",
+        "    FROM monthly_statistics\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        ORDER BY\r\n",
+        "            positive_ratio_pct DESC,\r\n",
+        "            avg_return_pct DESC,\r\n",
+        "            calendar_month\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "coverage AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        MIN(month_start_date) AS first_month,\r\n",
+        "        MAX(month_start_date) AS latest_month\r\n",
+        "\r\n",
+        "    FROM all_available_returns\r\n",
+        "\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    s.month_name AS strongest_month,\r\n",
+        "    s.avg_return_pct AS strongest_return_pct,\r\n",
+        "    s.positive_ratio_pct AS strongest_month_positive_ratio_pct,\r\n",
+        "\r\n",
+        "    w.month_name AS weakest_month,\r\n",
+        "    w.avg_return_pct AS weakest_return_pct,\r\n",
+        "    w.positive_ratio_pct AS weakest_month_positive_ratio_pct,\r\n",
+        "\r\n",
+        "    c.month_name AS consistent_month,\r\n",
+        "    c.positive_ratio_pct AS consistent_positive_ratio_pct,\r\n",
+        "    c.avg_return_pct AS consistent_month_avg_return_pct,\r\n",
+        "\r\n",
+        "    DATE_FORMAT(v.first_month, 'MMM yyyy') AS first_month_label,\r\n",
+        "    DATE_FORMAT(v.latest_month, 'MMM yyyy') AS latest_month_label,\r\n",
+        "\r\n",
+        "    CASE\r\n",
+        "        WHEN v.latest_month =\r\n",
+        "             CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "        THEN 'Includes current month-to-date data'\r\n",
+        "        ELSE 'Completed months only'\r\n",
+        "    END AS data_scope_label\r\n",
+        "\r\n",
+        "FROM strongest_month s\r\n",
+        "\r\n",
+        "CROSS JOIN weakest_month w\r\n",
+        "CROSS JOIN most_consistent_month c\r\n",
+        "CROSS JOIN coverage v;"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "gold"
+    },
+    {
+      "name": "94a149ad",
+      "displayName": "latest_price_date",
+      "queryLines": [
+        "SELECT MAX(price_date) AS latest_price_date\r\n",
+        "FROM silver.etf_prices_cleaned"
+      ],
+      "catalog": "etf_market_intelligence",
+      "schema": "silver"
+    }
+  ],
+  "pages": [
+    {
+      "name": "27d16b7d",
+      "displayName": "Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "b2e3aa50",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8386a00d",
+                  "fields": [
+                    {
+                      "name": "avg(avg_monthly_return_pct)",
+                      "expression": "AVG(`avg_monthly_return_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Market Average Return",
+                "headerAlignment": "center"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_monthly_return_pct)",
+                  "formatTemplate": "{{ @formatted }}%",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": ">="
+                        },
+                        "color": "#00A972"
+                      },
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": "="
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      },
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": "<"
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 1,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "817608b6",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8386a00d",
+                  "fields": [
+                    {
+                      "name": "max(positive_etf_ratio_pct)",
+                      "expression": "MAX(`positive_etf_ratio_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Positive ETF Ratio",
+                "headerAlignment": "center"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(positive_etf_ratio_pct)",
+                  "formatTemplate": "{{ @formatted }}%",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "60"
+                          },
+                          "operator": ">="
+                        },
+                        "color": "#00A972"
+                      },
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "40"
+                          },
+                          "operator": "<"
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      },
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "60"
+                          },
+                          "operator": "<"
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      },
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "40"
+                          },
+                          "operator": ">="
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 1,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "88aedf7b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8386a00d",
+                  "fields": [
+                    {
+                      "name": "header_display_value",
+                      "expression": "`header_display_value`"
+                    },
+                    {
+                      "name": "reporting_month_label",
+                      "expression": "`reporting_month_label`"
+                    },
+                    {
+                      "name": "latest_price_date_label",
+                      "expression": "`latest_price_date_label`"
+                    },
+                    {
+                      "name": "etfs_tracked",
+                      "expression": "`etfs_tracked`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": false
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "header_display_value",
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "="
+                        },
+                        "color": "#00A972"
+                      }
+                    ]
+                  },
+                  "formatTemplate": "Latest completed month: {{ reporting_month_label }} | Daily prices updated through: {{ latest_price_date_label }} | {{ etfs_tracked }} ETFs tracked"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "best-performer",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8386a00d",
+                  "fields": [
+                    {
+                      "name": "max(best_return_pct)",
+                      "expression": "MAX(`best_return_pct`)"
+                    },
+                    {
+                      "name": "best_symbol",
+                      "expression": "`best_symbol`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Best Performer",
+                "headerAlignment": "center",
+                "showDescription": false,
+                "description": "{{ best_etf_name }}"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(best_return_pct)",
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": ">="
+                        },
+                        "color": "#00A972"
+                      }
+                    ]
+                  },
+                  "formatTemplate": "{{ best_symbol }} | {{ @formatted }}%",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 3,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "15f21978",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8386a00d",
+                  "fields": [
+                    {
+                      "name": "max(worst_return_pct)",
+                      "expression": "MAX(`worst_return_pct`)"
+                    },
+                    {
+                      "name": "worst_symbol",
+                      "expression": "`worst_symbol`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Worst Performer",
+                "headerAlignment": "center",
+                "showDescription": false,
+                "description": "{{ best_etf_name }}"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(worst_return_pct)",
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": "<"
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "formatTemplate": "{{ worst_symbol }} | {{ @formatted }}%",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 3,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "etf-returns-latest-completed-month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "0d5d8b46",
+                  "fields": [
+                    {
+                      "name": "sum(monthly_return_pct)",
+                      "expression": "SUM(`monthly_return_pct`)"
+                    },
+                    {
+                      "name": "etf_name",
+                      "expression": "`etf_name`"
+                    },
+                    {
+                      "name": "asset_class",
+                      "expression": "`asset_class`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "max(monthly_return_pct)",
+                      "expression": "MAX(`monthly_return_pct`)"
+                    },
+                    {
+                      "name": "symbol",
+                      "expression": "`symbol`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Latest Monthly ETF Returns",
+                "headerAlignment": "center"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "max(monthly_return_pct)",
+                  "axis": {
+                    "title": "Monthly Return (%)",
+                    "hideGrid": false,
+                    "hideLabels": false
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "symbol",
+                  "axis": {
+                    "hideLabels": false
+                  },
+                  "formatTemplate": "{{ @formatted }}",
+                  "displayName": "ETF",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "INDA",
+                        "EFA",
+                        "EWJ",
+                        "BNDX",
+                        "BND",
+                        "EWU",
+                        "VEA",
+                        "VXUS",
+                        "VT",
+                        "ACWI",
+                        "QQQ",
+                        "VWO",
+                        "VOO",
+                        "SPY",
+                        "IEMG",
+                        "EWZ",
+                        "EWG",
+                        "VGT",
+                        "MCHI",
+                        "GLD"
+                      ]
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "sum(monthly_return_pct)",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redyellowgreen"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                },
+                "extra": [
+                  {
+                    "fieldName": "etf_name"
+                  },
+                  {
+                    "fieldName": "asset_class"
+                  },
+                  {
+                    "fieldName": "region"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "0fb3959e",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"text-align:center;display:block\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 12,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "44ebb604",
+      "displayName": "Performance & Comparison",
+      "layout": [
+        {
+          "widget": {
+            "name": "time-horizon",
+            "queries": [
+              {
+                "name": "dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b6c5ed010de9a20f233dddc49e5_time_horizon",
+                "query": {
+                  "datasetName": "fcd56975",
+                  "fields": [
+                    {
+                      "name": "time_horizon",
+                      "expression": "`time_horizon`"
+                    },
+                    {
+                      "name": "time_horizon_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b6ca0ca10e28275eb19240eb979_time_horizon",
+                "query": {
+                  "datasetName": "f40a0bc2",
+                  "parameters": [
+                    {
+                      "name": "time_horizon",
+                      "keyword": "time_horizon"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b716e1f125e8762241613f5a10c_time_horizon",
+                "query": {
+                  "datasetName": "53aaa356",
+                  "parameters": [
+                    {
+                      "name": "time_horizon",
+                      "keyword": "time_horizon"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Time Horizon"
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "time_horizon",
+                    "queryName": "dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b6c5ed010de9a20f233dddc49e5_time_horizon"
+                  },
+                  {
+                    "parameterName": "time_horizon",
+                    "queryName": "parameter_dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b6ca0ca10e28275eb19240eb979_time_horizon"
+                  },
+                  {
+                    "parameterName": "time_horizon",
+                    "queryName": "parameter_dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b716e1f125e8762241613f5a10c_time_horizon"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "8c0f8b72",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f40a0bc2",
+                  "fields": [
+                    {
+                      "name": "period_return_pct",
+                      "expression": "`period_return_pct`"
+                    },
+                    {
+                      "name": "etf_name",
+                      "expression": "`etf_name`"
+                    },
+                    {
+                      "name": "monthly(period_start_month)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `period_start_month`)"
+                    },
+                    {
+                      "name": "monthly(period_end_month)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `period_end_month`)"
+                    },
+                    {
+                      "name": "time_horizon",
+                      "expression": "`time_horizon`"
+                    },
+                    {
+                      "name": "months_available",
+                      "expression": "`months_available`"
+                    },
+                    {
+                      "name": "max(period_return_pct)",
+                      "expression": "MAX(`period_return_pct`)"
+                    },
+                    {
+                      "name": "symbol",
+                      "expression": "`symbol`"
+                    }
+                  ],
+                  "parameterValues": [
+                    {
+                      "keyword": "time_horizon",
+                      "selection": {}
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "max(period_return_pct)",
+                  "axis": {
+                    "title": "Period Return (%)"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "symbol",
+                  "displayName": "ETF",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "period_return_pct",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redyellowgreen"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                },
+                "extra": [
+                  {
+                    "fieldName": "etf_name"
+                  },
+                  {
+                    "fieldName": "monthly(period_start_month)"
+                  },
+                  {
+                    "fieldName": "monthly(period_end_month)"
+                  },
+                  {
+                    "fieldName": "time_horizon"
+                  },
+                  {
+                    "fieldName": "months_available"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 11
+          }
+        },
+        {
+          "widget": {
+            "name": "normalized-etf-growth-starting-value-100",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "53aaa356",
+                  "fields": [
+                    {
+                      "name": "symbol",
+                      "expression": "`symbol`"
+                    },
+                    {
+                      "name": "etf_name",
+                      "expression": "`etf_name`"
+                    },
+                    {
+                      "name": "time_horizon",
+                      "expression": "`time_horizon`"
+                    },
+                    {
+                      "name": "monthly(month_start_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `month_start_date`)"
+                    },
+                    {
+                      "name": "max(normalized_value)",
+                      "expression": "MAX(`normalized_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Normalized ETF Growth — Start = 100",
+                "headerAlignment": "center"
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(month_start_date)",
+                  "axis": {
+                    "title": "Month"
+                  },
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "max(normalized_value)",
+                  "axis": {
+                    "title": "Indexed Value (Start = 100)"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "symbol",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "etf_name"
+                  },
+                  {
+                    "fieldName": "time_horizon"
+                  },
+                  {
+                    "fieldName": "symbol"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 6,
+            "height": 11
+          }
+        },
+        {
+          "widget": {
+            "name": "compare-etfs",
+            "queries": [
+              {
+                "name": "dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b716e1f125e8762241613f5a10c_symbol",
+                "query": {
+                  "datasetName": "53aaa356",
+                  "fields": [
+                    {
+                      "name": "symbol",
+                      "expression": "`symbol`"
+                    },
+                    {
+                      "name": "symbol_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Compare ETFs"
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "VOO"
+                      },
+                      {
+                        "value": "VGT"
+                      },
+                      {
+                        "value": "QQQ"
+                      },
+                      {
+                        "value": "GLD"
+                      },
+                      {
+                        "value": "BND"
+                      }
+                    ]
+                  }
+                }
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "symbol",
+                    "queryName": "dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b716e1f125e8762241613f5a10c_symbol"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "5389acf5",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"text-align:center;display:block\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 12,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "41d929be",
+      "displayName": "Seasonality",
+      "layout": [
+        {
+          "widget": {
+            "name": "average-monthly-return-etf-calendar-month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "90ee599e",
+                  "fields": [
+                    {
+                      "name": "symbol",
+                      "expression": "`symbol`"
+                    },
+                    {
+                      "name": "month_label",
+                      "expression": "`month_label`"
+                    },
+                    {
+                      "name": "max(avg_monthly_return_pct)",
+                      "expression": "MAX(`avg_monthly_return_pct`)"
+                    }
+                  ],
+                  "cubeGroupingSets": {
+                    "sets": [
+                      {
+                        "fieldNames": [
+                          "symbol"
+                        ]
+                      },
+                      {
+                        "fieldNames": [
+                          "month_label"
+                        ]
+                      }
+                    ]
+                  },
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`symbol`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`month_label`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 4,
+              "frame": {
+                "showTitle": true,
+                "title": "Average Monthly Return by ETF and Calendar Month",
+                "headerAlignment": "center",
+                "showDescription": false
+              },
+              "widgetType": "pivot",
+              "encodings": {
+                "rows": {
+                  "fields": [
+                    {
+                      "fieldName": "symbol",
+                      "scale": {
+                        "type": "categorical"
+                      }
+                    }
+                  ]
+                },
+                "columns": {
+                  "fields": [
+                    {
+                      "fieldName": "month_label",
+                      "scale": {
+                        "type": "categorical"
+                      }
+                    }
+                  ]
+                },
+                "cells": {
+                  "fields": [
+                    {
+                      "fieldName": "max(avg_monthly_return_pct)",
+                      "format": {
+                        "type": "number-plain",
+                        "abbreviation": "none",
+                        "decimalPlaces": {
+                          "type": "exact",
+                          "places": 2
+                        },
+                        "hideGroupSeparator": true
+                      },
+                      "displayName": "Average Return (%)",
+                      "cellType": "text",
+                      "style": {
+                        "type": "color-scale",
+                        "backgroundColor": {
+                          "scale": {
+                            "type": "quantitative",
+                            "reverse": false,
+                            "colorRamp": {
+                              "mode": "scheme",
+                              "scheme": "redyellowgreen"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "displayAs": "rows"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 12,
+            "height": 12
+          }
+        },
+        {
+          "widget": {
+            "name": "229d45e0",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6d697d1c",
+                  "fields": [
+                    {
+                      "name": "latest_month_label",
+                      "expression": "`latest_month_label`"
+                    },
+                    {
+                      "name": "first_month_label",
+                      "expression": "`first_month_label`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "latest_month_label",
+                  "formatTemplate": "Historical seasonality: {{ first_month_label }} – {{ latest_month_label }} | Includes current month-to-date data"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "highest-average-month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6d697d1c",
+                  "fields": [
+                    {
+                      "name": "max(strongest_return_pct)",
+                      "expression": "MAX(`strongest_return_pct`)"
+                    },
+                    {
+                      "name": "strongest_month",
+                      "expression": "`strongest_month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Highest Average Month",
+                "headerAlignment": "center"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(strongest_return_pct)",
+                  "formatTemplate": "{{ strongest_month }} | {{ @formatted }}%",
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "1"
+                          },
+                          "operator": ">="
+                        },
+                        "color": "#00A972"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "9696f145",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6d697d1c",
+                  "fields": [
+                    {
+                      "name": "max(weakest_return_pct)",
+                      "expression": "MAX(`weakest_return_pct`)"
+                    },
+                    {
+                      "name": "weakest_month",
+                      "expression": "`weakest_month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Lowest Average Month",
+                "headerAlignment": "center"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(weakest_return_pct)",
+                  "formatTemplate": "{{ weakest_month }} | {{ @formatted }}%",
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": "<"
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "41bdef3c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6d697d1c",
+                  "fields": [
+                    {
+                      "name": "max(consistent_positive_ratio_pct)",
+                      "expression": "MAX(`consistent_positive_ratio_pct`)"
+                    },
+                    {
+                      "name": "consistent_month",
+                      "expression": "`consistent_month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Most Frequently Positive Month",
+                "headerAlignment": "center"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(consistent_positive_ratio_pct)",
+                  "formatTemplate": "{{ consistent_month }} | {{ @formatted }}%",
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": ">="
+                        },
+                        "color": "#00A972"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 1,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "ae643bab",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"text-align:center;display:block\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "fc2c343f",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "2e8497e9",
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {},
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
