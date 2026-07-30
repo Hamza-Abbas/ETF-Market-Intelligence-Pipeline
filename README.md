@@ -3,12 +3,13 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![dbt](https://img.shields.io/badge/dbt%20Core-1.12-FF694B?logo=dbt&logoColor=white)](https://www.getdbt.com/)
 [![Databricks](https://img.shields.io/badge/Databricks-Delta%20Lake-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
+![Status](https://img.shields.io/badge/Project%20Status-Complete-2EA44F)
 
 An automated ETF analytics pipeline that ingests daily market data from Yahoo Finance, stores it in Databricks Delta tables, transforms it through a Bronze–Silver–Gold Medallion Architecture with dbt, and refreshes a native Databricks financial dashboard.
 
 The project tracks **20 USD-listed ETFs** across US equities, international markets, emerging markets, technology, bonds, and commodities.
 
-> **Current status:** the complete cloud workflow is operational. A scheduled Databricks Job fetches the latest ETF prices, merges them into Bronze, runs dbt transformations and tests for Silver and Gold, and refreshes the published dashboard as the final dependent task.
+> **Project status: Complete.** The intended project scope has been delivered. A scheduled Databricks Job fetches the latest ETF prices, merges them into Bronze, runs dbt transformations and tests for Silver and Gold, and refreshes the published dashboard as the final dependent task.
 
 ## Project Snapshot
 
@@ -160,7 +161,7 @@ Alert thresholds:
 | `>= 4%` | `POSITIVE_MOMENTUM` | Medium |
 | `<= -4%` | `NEGATIVE_MOMENTUM` | Medium |
 
-The dashboard currently focuses on performance and seasonality; the risk and alert marts remain available for later expansion.
+The final dashboard intentionally focuses on performance, comparison, and seasonality. The risk and alert marts remain part of the completed analytical layer but are not surfaced in the published dashboard.
 
 ## Databricks Financial Dashboard
 
@@ -391,59 +392,37 @@ git diff --cached
 
 | Capability | Status |
 | --- | --- |
-| Historical ingestion for 20 ETFs | Done |
-| Bronze Delta baseline and daily growth | Done |
-| Silver transformation layer | Done |
-| Five Gold analytical marts | Done |
-| dbt tests on Silver and Gold | Done |
-| Full ETF metadata and classifications | Done |
-| Idempotent Spark incremental ingestion | Done |
-| Git-backed Databricks Job execution | Done |
-| Daily cloud schedule | Done |
-| Published three-page Databricks dashboard | Done |
-| Dashboard refresh as third Job task | Done |
-| Dashboard definition exported to Git | Done |
-| Gmail success and failure notifications | Planned |
-| Structured operational observability | Planned |
-| Public dashboard deployment | Future enhancement |
+| Historical ingestion for 20 ETFs | Complete |
+| Bronze Delta baseline and daily incremental growth | Complete |
+| Silver transformation layer | Complete |
+| Five Gold analytical marts | Complete |
+| dbt tests on Silver and Gold | Complete |
+| Full ETF metadata and classifications | Complete |
+| Idempotent Spark incremental ingestion | Complete |
+| Git-backed Databricks Job execution | Complete |
+| Daily cloud schedule | Complete |
+| Published three-page Databricks dashboard | Complete |
+| Automated dashboard refresh task | Complete |
+| Dashboard definition exported to Git | Complete |
+| **Overall project** | **Complete** |
 
-## Roadmap
+## Project Completion
 
-### Phase 1 — Core Medallion Pipeline ✅
+The project is considered **finished at its current scope**.
 
-- Historical ETF ingestion.
-- Bronze, Silver, and Gold Delta layers.
-- dbt models, sources, tests, and Gold marts.
+Delivered components:
 
-### Phase 2 — Cloud Automation ✅
+- Historical and daily incremental ETF ingestion.
+- Idempotent Spark merges into Databricks Bronze.
+- Bronze, Silver, and Gold Medallion Architecture.
+- dbt models, sources, tests, and analytical marts.
+- Scheduled three-task Databricks workflow.
+- Published three-page financial dashboard.
+- Automated dashboard refresh after successful transformations.
+- Dashboard screenshots and version-controlled `.lvdash.json` definition.
+- Security, documentation, and reproducibility guidance.
 
-- Databricks Git integration.
-- Spark incremental ingestion.
-- Scheduled Databricks Job.
-- Dependent dbt build task.
-
-### Phase 3 — Financial Dashboard ✅
-
-- Native Databricks dashboard.
-- Overview, Performance & Comparison, and Seasonality pages.
-- Parameterized horizon and ETF filters.
-- Automated dashboard refresh task.
-- Dashboard screenshots and `.lvdash.json` export.
-
-### Phase 4 — Observability and Notifications
-
-- Structured pipeline-run metrics.
-- Data-freshness and row-count alerts.
-- Success and failure notifications.
-- Notification deduplication.
-
-### Phase 5 — Analytics Expansion
-
-- Drawdown analysis.
-- Annualized volatility.
-- Rolling returns.
-- Trading-volume analytics.
-- Expanded alert and risk views.
+There is no active roadmap for additional development. Future changes may be added later as optional extensions, but they are not required for this project to be considered complete.
 
 ## Author
 
