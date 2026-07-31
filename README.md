@@ -250,7 +250,6 @@ The dashboard is published with shared data permissions, so approved viewers do 
 Official references:
 
 - [Sign up for Databricks Free Edition](https://docs.databricks.com/aws/en/getting-started/free-edition)
-- [Share a Databricks dashboard](https://docs.databricks.com/aws/en/dashboards/share/share)
 
 ### Dashboard as Code
 
