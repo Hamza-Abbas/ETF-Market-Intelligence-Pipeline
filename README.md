@@ -70,6 +70,7 @@ flowchart LR
     I --> H
 ```
 
+
 ## Ingestion Design
 
 ### Historical Bootstrap
