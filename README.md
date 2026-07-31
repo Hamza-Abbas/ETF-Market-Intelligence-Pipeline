@@ -219,6 +219,44 @@ Because the page includes current month-to-date data, the leading calendar month
 
 ![ETF Seasonality](docs/dashboard/seasonality.png)
 
+### Request Access to the Live Dashboard
+
+The published dashboard is hosted inside a private Databricks account, so it is not available through a fully public link. Read-only access can be granted on request.
+
+#### Request access through LinkedIn
+
+1. Open my [LinkedIn profile](https://www.linkedin.com/in/hamza-abbas-data-engineer/).
+2. Send a short message requesting access to the **ETF Market Intelligence Dashboard**.
+3. Include the email address you want to use for Databricks.
+4. I will add that email to my Databricks account or workspace and grant **Can View** access to the published dashboard.
+5. Accept the Databricks invitation and sign in with the same email address.
+
+Suggested message:
+
+```text
+Hi Hamza, I found your ETF Market Intelligence Pipeline on GitHub and would like to explore the live Databricks dashboard. Could you please grant view access to [your email address]? Thank you.
+```
+
+Dashboard access is read-only. Viewers can open the published dashboard, change filters, compare ETFs, and interact with the visualizations, but they cannot edit the dashboard, queries, or underlying datasets. Access can be revoked at any time.
+
+#### Create a Databricks Free Edition account
+
+A Databricks Free Edition account is useful for exploring the platform independently. To create one:
+
+1. Open the official [Databricks Free Edition signup page](https://login.databricks.com/).
+2. Choose a signup method and register with an email address.
+3. Complete email verification and sign in.
+4. Databricks will create a separate Free Edition workspace for your personal use.
+
+> **Important:** Creating your own Free Edition workspace does not automatically provide access to this dashboard. Access to this project still requires an invitation to my Databricks account and explicit **Can View** permission. Use the same email address in your LinkedIn request so the invitation can be matched correctly.
+
+The dashboard is published with shared data permissions, so approved viewers do not need separate access to the underlying Silver and Gold tables or the SQL compute used by the dashboard.
+
+Official references:
+
+- [Sign up for Databricks Free Edition](https://docs.databricks.com/aws/en/getting-started/free-edition)
+- [Share a Databricks dashboard](https://docs.databricks.com/aws/en/dashboards/share/share)
+
 ### Dashboard as Code
 
 The exported Databricks dashboard definition is versioned here:
