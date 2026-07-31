@@ -231,13 +231,8 @@ The published dashboard is hosted inside a private Databricks account, so it is 
 4. I will add that email to my Databricks account or workspace and grant **Can View** access to the published dashboard.
 5. Accept the Databricks invitation and sign in with the same email address.
 
-Suggested message:
 
-```text
-Hi Hamza, I found your ETF Market Intelligence Pipeline on GitHub and would like to explore the live Databricks dashboard. Could you please grant view access to [your email address]? Thank you.
-```
-
-Dashboard access is read-only. Viewers can open the published dashboard, change filters, compare ETFs, and interact with the visualizations, but they cannot edit the dashboard, queries, or underlying datasets. Access can be revoked at any time.
+Dashboard access is read-only. Viewers can open the published dashboard, change filters, compare ETFs, and interact with the visualizations, but they cannot edit the dashboard, queries, or underlying datasets.
 
 #### Create a Databricks Free Edition account
 
