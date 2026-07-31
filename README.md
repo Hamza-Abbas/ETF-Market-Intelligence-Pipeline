@@ -5,11 +5,20 @@
 [![Databricks](https://img.shields.io/badge/Databricks-Delta%20Lake-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
 ![Status](https://img.shields.io/badge/Project%20Status-Complete-2EA44F)
 
-An automated ETF analytics pipeline that ingests daily market data from Yahoo Finance, stores it in Databricks Delta tables, transforms it through a Bronze–Silver–Gold Medallion Architecture with dbt, and refreshes a native Databricks financial dashboard.
+An automated cloud data platform that turns daily ETF market data into trusted, decision-ready analytics. The pipeline tracks **20 USD-listed ETFs** from 2015 onward, ingests the latest prices with Python and Spark, transforms them through a Bronze–Silver–Gold Medallion Architecture with dbt, validates the data with automated tests, and refreshes a published Databricks dashboard.
 
-The project tracks **20 USD-listed ETFs** across US equities, international markets, emerging markets, technology, bonds, and commodities.
+The ETF universe covers US equities, international and emerging markets, technology, bonds, and commodities.
 
-> **Project status: Complete.** The intended project scope has been delivered. A scheduled Databricks Job fetches the latest ETF prices, merges them into Bronze, runs dbt transformations and tests for Silver and Gold, and refreshes the published dashboard as the final dependent task.
+> **Project status: Complete.** A scheduled three-task Databricks Job performs daily ingestion, builds and tests the Silver and Gold layers, and refreshes the dashboard without requiring a local machine or manual intervention.
+
+## What the Project Delivers
+
+- A fully automated daily pipeline for **20 ETFs**.
+- Historical market coverage from **2015 onward**.
+- Idempotent Delta Lake merges that prevent duplicate `(symbol, price_date)` records.
+- **6 dbt models**, **82 data-quality tests**, and **5 Gold analytical marts**.
+- A three-page dashboard for rolling market performance, configurable ETF comparisons, and historical seasonality.
+- Version-controlled Python, dbt, and Databricks dashboard definitions for reproducibility.
 
 ## Project Snapshot
 
@@ -19,7 +28,7 @@ Operational status as of **30 July 2026**:
 | --- | ---: |
 | ETFs tracked | 20 |
 | Historical coverage | From 2015-01-02 |
-| Latest automated price date validated | 2026-07-29 |
+| Latest automated price date validated | 2026-07-30 |
 | Duplicate `(symbol, price_date)` keys | 0 |
 | dbt models | 6 |
 | dbt data tests | 82 |
@@ -161,23 +170,23 @@ Alert thresholds:
 | `>= 4%` | `POSITIVE_MOMENTUM` | Medium |
 | `<= -4%` | `NEGATIVE_MOMENTUM` | Medium |
 
-The final dashboard intentionally focuses on performance, comparison, and seasonality. The risk and alert marts remain part of the completed analytical layer but are not surfaced in the published dashboard.
+The published dashboard focuses on current performance, configurable comparison, and seasonality. The risk and alert marts remain available in the analytical layer for technical exploration but are intentionally not exposed in the final dashboard navigation.
 
 ## Databricks Financial Dashboard
 
-The native Databricks dashboard is published and refreshed as the final task in the daily pipeline.
+The native Databricks AI/BI dashboard is published and refreshed automatically as the final task in the daily pipeline.
 
 ### 1. Overview
 
-The landing page presents:
+The landing page provides a rolling **30-calendar-day market snapshot** through the latest available trading date:
 
-- Latest completed reporting month.
-- Latest available daily price date.
-- Number of ETFs tracked.
-- Market average monthly return.
-- Positive ETF ratio.
-- Best and worst monthly performers.
-- Ranked latest-month ETF returns.
+- Average 30-day return across all tracked ETFs.
+- Percentage of ETFs with a positive 30-day return.
+- Best and worst 30-day performers.
+- Complete ETF return ranking using a red–yellow–green diverging scale.
+- Dynamic data-freshness banner showing the latest market date and ETF count.
+
+The 30-day calculation uses adjusted closing prices and selects the nearest available trading date on or before the 30-day start date.
 
 ![ETF Market Intelligence Overview](docs/dashboard/overview.png)
 
@@ -185,23 +194,28 @@ The landing page presents:
 
 The performance page supports:
 
-- Dynamic horizons: `1M`, `3M`, `6M`, `YTD`, `1Y`, `3Y`, `5Y`, and `MAX`.
+- Dynamic horizons: `1D`, `1W`, `1M`, `3M`, `6M`, `YTD`, `1Y`, `3Y`, `5Y`, and `MAX`.
 - ETF return ranking for the selected horizon.
 - Multi-select ETF comparison.
-- Normalized growth from a common starting value of 100.
-- Compounded period-return calculations.
+- Daily normalized growth from a common starting value of 100.
+- Calculations extending through the latest available trading date.
+
+`1D` compares the two latest trading sessions. `1W` compares the latest close with the close five trading sessions earlier. Longer horizons use daily adjusted closing prices from the Silver layer.
 
 ![ETF Performance and Comparison](docs/dashboard/performance-comparison.png)
 
 ### 3. Seasonality
 
-The seasonality page presents:
+The seasonality page provides:
 
-- Highest average calendar month.
-- Lowest average calendar month.
+- Dynamically calculated highest-average calendar month.
+- Lowest-average calendar month.
 - Most frequently positive calendar month.
-- ETF-by-month return heatmap.
-- Current month-to-date data in the seasonality calculations.
+- ETF-by-month average-return heatmap.
+- Historical data from January 2015 onward.
+- Current month-to-date observations, clearly disclosed in the page banner and footer.
+
+Because the page includes current month-to-date data, the leading calendar month can change after each successful daily refresh.
 
 ![ETF Seasonality](docs/dashboard/seasonality.png)
 
@@ -213,7 +227,7 @@ The exported Databricks dashboard definition is versioned here:
 databricks/dashboards/etf_market_intelligence.lvdash.json
 ```
 
-The export contains the dashboard pages, SQL datasets, parameters, filters, widget layouts, conditional formatting, and saved defaults. It does not contain the underlying market data or Databricks credentials.
+The export contains dashboard pages, SQL datasets, parameters, filters, widget layouts, conditional formatting, and saved defaults. This keeps the analytical interface reviewable in Git alongside the ingestion and transformation code. It does not contain the underlying market data or Databricks credentials.
 
 ## ETF Universe
 

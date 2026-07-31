@@ -205,69 +205,107 @@
       "name": "8386a00d",
       "displayName": "overview_kpis",
       "queryLines": [
-        "WITH completed_monthly_returns AS (\r\n",
+        "WITH latest_market_date AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        symbol,\r\n",
-        "        month_start_date,\r\n",
-        "        monthly_return_pct\r\n",
-        "    FROM gold.etf_month_by_month_performance\r\n",
-        "    WHERE month_start_date <\r\n",
-        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
-        "      AND monthly_return_pct IS NOT NULL\r\n",
+        "        MAX(price_date) AS latest_date\r\n",
         "\r\n",
-        "),\r\n",
-        "\r\n",
-        "latest_reporting_month AS (\r\n",
-        "\r\n",
-        "    SELECT\r\n",
-        "        MAX(month_start_date) AS reporting_month\r\n",
-        "    FROM completed_monthly_returns\r\n",
-        "\r\n",
-        "),\r\n",
-        "\r\n",
-        "latest_price AS (\r\n",
-        "\r\n",
-        "    SELECT\r\n",
-        "        MAX(price_date) AS latest_price_date\r\n",
         "    FROM silver.etf_prices_cleaned\r\n",
+        "\r\n",
+        "    WHERE adjusted_closing_price IS NOT NULL\r\n",
+        "\r\n",
         "),\r\n",
         "\r\n",
-        "latest_returns AS (\r\n",
+        "latest_prices AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        r.symbol,\r\n",
-        "        r.month_start_date,\r\n",
-        "        r.monthly_return_pct\r\n",
-        "    FROM completed_monthly_returns r\r\n",
-        "    INNER JOIN latest_reporting_month lm\r\n",
-        "        ON r.month_start_date = lm.reporting_month\r\n",
+        "        p.symbol,\r\n",
+        "        p.price_date AS end_date,\r\n",
+        "        p.adjusted_closing_price AS ending_price\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned p\r\n",
+        "\r\n",
+        "    CROSS JOIN latest_market_date l\r\n",
+        "\r\n",
+        "    WHERE p.adjusted_closing_price IS NOT NULL\r\n",
+        "      AND p.price_date <= l.latest_date\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        PARTITION BY p.symbol\r\n",
+        "        ORDER BY p.price_date DESC\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "starting_prices AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        p.symbol,\r\n",
+        "        p.price_date AS start_date,\r\n",
+        "        p.adjusted_closing_price AS starting_price\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned p\r\n",
+        "\r\n",
+        "    CROSS JOIN latest_market_date l\r\n",
+        "\r\n",
+        "    WHERE p.adjusted_closing_price IS NOT NULL\r\n",
+        "\r\n",
+        "      -- Thirty calendar days before the latest market date.\r\n",
+        "      -- The latest available trading date on or before that\r\n",
+        "      -- target date is selected.\r\n",
+        "      AND p.price_date <= DATE_SUB(l.latest_date, 30)\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        PARTITION BY p.symbol\r\n",
+        "        ORDER BY p.price_date DESC\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "rolling_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        e.symbol,\r\n",
+        "        s.start_date,\r\n",
+        "        e.end_date,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            100 * (\r\n",
+        "                e.ending_price\r\n",
+        "                / NULLIF(s.starting_price, 0)\r\n",
+        "                - 1\r\n",
+        "            ),\r\n",
+        "            2\r\n",
+        "        ) AS return_30d_pct\r\n",
+        "\r\n",
+        "    FROM latest_prices e\r\n",
+        "\r\n",
+        "    INNER JOIN starting_prices s\r\n",
+        "        ON e.symbol = s.symbol\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
         "market_statistics AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        COUNT(DISTINCT symbol) AS etfs_tracked,\r\n",
+        "        COUNT(*) AS etfs_tracked,\r\n",
         "\r\n",
         "        ROUND(\r\n",
-        "            AVG(monthly_return_pct),\r\n",
+        "            AVG(return_30d_pct),\r\n",
         "            2\r\n",
-        "        ) AS avg_monthly_return_pct,\r\n",
+        "        ) AS avg_30d_return_pct,\r\n",
         "\r\n",
         "        ROUND(\r\n",
-        "            100.0\r\n",
-        "            * SUM(\r\n",
+        "            100.0 * AVG(\r\n",
         "                CASE\r\n",
-        "                    WHEN monthly_return_pct > 0 THEN 1\r\n",
-        "                    ELSE 0\r\n",
+        "                    WHEN return_30d_pct > 0 THEN 1.0\r\n",
+        "                    ELSE 0.0\r\n",
         "                END\r\n",
-        "            )\r\n",
-        "            / COUNT(*),\r\n",
+        "            ),\r\n",
         "            1\r\n",
         "        ) AS positive_etf_ratio_pct\r\n",
         "\r\n",
-        "    FROM latest_returns\r\n",
+        "    FROM rolling_returns\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
@@ -276,14 +314,16 @@
         "    SELECT\r\n",
         "        r.symbol AS best_symbol,\r\n",
         "        COALESCE(m.etf_name, r.symbol) AS best_etf_name,\r\n",
-        "        ROUND(r.monthly_return_pct, 2) AS best_return_pct\r\n",
-        "    FROM latest_returns r\r\n",
+        "        r.return_30d_pct AS best_30d_return_pct\r\n",
+        "\r\n",
+        "    FROM rolling_returns r\r\n",
+        "\r\n",
         "    LEFT JOIN reference.etf_metadata m\r\n",
         "        ON r.symbol = m.symbol\r\n",
         "\r\n",
         "    QUALIFY ROW_NUMBER() OVER (\r\n",
         "        ORDER BY\r\n",
-        "            r.monthly_return_pct DESC,\r\n",
+        "            r.return_30d_pct DESC,\r\n",
         "            r.symbol\r\n",
         "    ) = 1\r\n",
         "\r\n",
@@ -294,48 +334,81 @@
         "    SELECT\r\n",
         "        r.symbol AS worst_symbol,\r\n",
         "        COALESCE(m.etf_name, r.symbol) AS worst_etf_name,\r\n",
-        "        ROUND(r.monthly_return_pct, 2) AS worst_return_pct\r\n",
-        "    FROM latest_returns r\r\n",
+        "        r.return_30d_pct AS worst_30d_return_pct\r\n",
+        "\r\n",
+        "    FROM rolling_returns r\r\n",
+        "\r\n",
         "    LEFT JOIN reference.etf_metadata m\r\n",
         "        ON r.symbol = m.symbol\r\n",
         "\r\n",
         "    QUALIFY ROW_NUMBER() OVER (\r\n",
         "        ORDER BY\r\n",
-        "            r.monthly_return_pct ASC,\r\n",
+        "            r.return_30d_pct ASC,\r\n",
         "            r.symbol\r\n",
         "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "reporting_period AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        MIN(start_date) AS period_start_date,\r\n",
+        "        MAX(end_date) AS latest_price_date\r\n",
+        "\r\n",
+        "    FROM rolling_returns\r\n",
         "\r\n",
         ")\r\n",
         "\r\n",
         "SELECT\r\n",
-        "    lm.reporting_month,\r\n",
+        "    p.period_start_date,\r\n",
+        "    p.latest_price_date,\r\n",
+        "\r\n",
         "    DATE_FORMAT(\r\n",
-        "    lm.reporting_month,\r\n",
-        "    'MMMM yyyy'\r\n",
-        ") AS reporting_month_label,\r\n",
-        "    DATE_FORMAT(\r\n",
-        "    lp.latest_price_date,\r\n",
-        "    'MMMM d, yyyy'\r\n",
-        ") AS latest_price_date_label, \r\n",
+        "        p.latest_price_date,\r\n",
+        "        'MMMM d, yyyy'\r\n",
+        "    ) AS latest_price_date_label,\r\n",
+        "\r\n",
+        "    CONCAT(\r\n",
+        "        'Rolling 30-Day Market Snapshot | Prices updated through ',\r\n",
+        "        DATE_FORMAT(p.latest_price_date, 'MMMM d, yyyy'),\r\n",
+        "        ' | ',\r\n",
+        "        ms.etfs_tracked,\r\n",
+        "        ' ETFs tracked'\r\n",
+        "    ) AS overview_header_label,\r\n",
+        "\r\n",
         "    ms.etfs_tracked,\r\n",
-        "    ms.avg_monthly_return_pct,\r\n",
+        "    ms.avg_30d_return_pct,\r\n",
         "    ms.positive_etf_ratio_pct,\r\n",
         "\r\n",
         "    b.best_symbol,\r\n",
         "    b.best_etf_name,\r\n",
-        "    b.best_return_pct,\r\n",
+        "    b.best_30d_return_pct,\r\n",
         "\r\n",
         "    w.worst_symbol,\r\n",
         "    w.worst_etf_name,\r\n",
-        "    w.worst_return_pct,\r\n",
+        "    w.worst_30d_return_pct,\r\n",
+        "\r\n",
+        "    CONCAT(\r\n",
+        "    b.best_etf_name,\r\n",
+        "    ' (',\r\n",
+        "    CAST(b.best_30d_return_pct AS STRING),\r\n",
+        "    '%)'\r\n",
+        ") AS best_performer_label,\r\n",
+        "\r\n",
+        "CONCAT(\r\n",
+        "    w.worst_etf_name,\r\n",
+        "    ' (',\r\n",
+        "    CAST(w.worst_30d_return_pct AS STRING),\r\n",
+        "    '%)'\r\n",
+        ") AS worst_performer_label,\r\n",
         "\r\n",
         "    1 AS header_display_value\r\n",
         "\r\n",
-        "FROM latest_reporting_month lm\r\n",
-        "CROSS JOIN market_statistics ms\r\n",
+        "FROM market_statistics ms\r\n",
+        "\r\n",
         "CROSS JOIN best_etf b\r\n",
         "CROSS JOIN worst_etf w\r\n",
-        "CROSS JOIN latest_price lp;"
+        "CROSS JOIN reporting_period p;"
       ],
       "catalog": "etf_market_intelligence",
       "schema": "gold"
@@ -344,24 +417,79 @@
       "name": "0d5d8b46",
       "displayName": "latest_month_return_rankings",
       "queryLines": [
-        "WITH completed_monthly_returns AS (\r\n",
+        "WITH latest_market_date AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        symbol,\r\n",
-        "        month_start_date,\r\n",
-        "        monthly_return_pct\r\n",
-        "    FROM gold.etf_month_by_month_performance\r\n",
-        "    WHERE month_start_date <\r\n",
-        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
-        "      AND monthly_return_pct IS NOT NULL\r\n",
+        "        MAX(price_date) AS latest_date\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned\r\n",
+        "\r\n",
+        "    WHERE adjusted_closing_price IS NOT NULL\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
-        "latest_reporting_month AS (\r\n",
+        "latest_prices AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        MAX(month_start_date) AS reporting_month\r\n",
-        "    FROM completed_monthly_returns\r\n",
+        "        p.symbol,\r\n",
+        "        p.price_date AS end_date,\r\n",
+        "        p.adjusted_closing_price AS ending_price\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned p\r\n",
+        "\r\n",
+        "    CROSS JOIN latest_market_date l\r\n",
+        "\r\n",
+        "    WHERE p.adjusted_closing_price IS NOT NULL\r\n",
+        "      AND p.price_date <= l.latest_date\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        PARTITION BY p.symbol\r\n",
+        "        ORDER BY p.price_date DESC\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "starting_prices AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        p.symbol,\r\n",
+        "        p.price_date AS start_date,\r\n",
+        "        p.adjusted_closing_price AS starting_price\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned p\r\n",
+        "\r\n",
+        "    CROSS JOIN latest_market_date l\r\n",
+        "\r\n",
+        "    WHERE p.adjusted_closing_price IS NOT NULL\r\n",
+        "      AND p.price_date <= DATE_SUB(l.latest_date, 30)\r\n",
+        "\r\n",
+        "    QUALIFY ROW_NUMBER() OVER (\r\n",
+        "        PARTITION BY p.symbol\r\n",
+        "        ORDER BY p.price_date DESC\r\n",
+        "    ) = 1\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "rolling_returns AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        e.symbol,\r\n",
+        "        s.start_date,\r\n",
+        "        e.end_date,\r\n",
+        "\r\n",
+        "        ROUND(\r\n",
+        "            100 * (\r\n",
+        "                e.ending_price\r\n",
+        "                / NULLIF(s.starting_price, 0)\r\n",
+        "                - 1\r\n",
+        "            ),\r\n",
+        "            2\r\n",
+        "        ) AS return_30d_pct\r\n",
+        "\r\n",
+        "    FROM latest_prices e\r\n",
+        "\r\n",
+        "    INNER JOIN starting_prices s\r\n",
+        "        ON e.symbol = s.symbol\r\n",
         "\r\n",
         ")\r\n",
         "\r\n",
@@ -370,19 +498,24 @@
         "    COALESCE(m.etf_name, r.symbol) AS etf_name,\r\n",
         "    m.asset_class,\r\n",
         "    m.region,\r\n",
-        "    r.month_start_date AS reporting_month,\r\n",
-        "    ROUND(r.monthly_return_pct, 2) AS monthly_return_pct\r\n",
+        "    m.category,\r\n",
         "\r\n",
-        "FROM completed_monthly_returns r\r\n",
+        "    r.start_date,\r\n",
+        "    r.end_date,\r\n",
+        "    r.return_30d_pct,\r\n",
         "\r\n",
-        "INNER JOIN latest_reporting_month lm\r\n",
-        "    ON r.month_start_date = lm.reporting_month\r\n",
+        "    CASE\r\n",
+        "        WHEN r.return_30d_pct >= 0 THEN 'Positive'\r\n",
+        "        ELSE 'Negative'\r\n",
+        "    END AS return_direction\r\n",
+        "\r\n",
+        "FROM rolling_returns r\r\n",
         "\r\n",
         "LEFT JOIN reference.etf_metadata m\r\n",
         "    ON r.symbol = m.symbol\r\n",
         "\r\n",
         "ORDER BY\r\n",
-        "    r.monthly_return_pct DESC,\r\n",
+        "    r.return_30d_pct DESC,\r\n",
         "    r.symbol;"
       ],
       "catalog": "etf_market_intelligence",
@@ -394,16 +527,17 @@
       "queryLines": [
         "SELECT *\r\n",
         "FROM VALUES\r\n",
-        "    ('1M', 1),\r\n",
-        "    ('3M', 2),\r\n",
-        "    ('6M', 3),\r\n",
-        "    ('YTD', 4),\r\n",
-        "    ('1Y', 5),\r\n",
-        "    ('3Y', 6),\r\n",
-        "    ('5Y', 7),\r\n",
-        "    ('MAX', 8)\r\n",
+        "    ('1D', 1),\r\n",
+        "    ('1W', 2),\r\n",
+        "    ('1M', 3),\r\n",
+        "    ('3M', 4),\r\n",
+        "    ('6M', 5),\r\n",
+        "    ('YTD', 6),\r\n",
+        "    ('1Y', 7),\r\n",
+        "    ('3Y', 8),\r\n",
+        "    ('5Y', 9),\r\n",
+        "    ('MAX', 10)\r\n",
         "AS periods(time_horizon, sort_order)\r\n",
-        "\r\n",
         "ORDER BY sort_order;"
       ],
       "catalog": "etf_market_intelligence",
@@ -419,15 +553,32 @@
         "\r\n",
         "),\r\n",
         "\r\n",
-        "latest_completed_month AS (\r\n",
+        "latest_market_date AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        MAX(month_start_date) AS latest_month\r\n",
+        "        MAX(price_date) AS latest_date\r\n",
         "\r\n",
-        "    FROM gold.etf_month_by_month_performance\r\n",
+        "    FROM silver.etf_prices_cleaned\r\n",
         "\r\n",
-        "    WHERE month_start_date <\r\n",
-        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "    WHERE adjusted_closing_price IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "ranked_daily_prices AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        price_date,\r\n",
+        "        adjusted_closing_price,\r\n",
+        "\r\n",
+        "        ROW_NUMBER() OVER (\r\n",
+        "            PARTITION BY symbol\r\n",
+        "            ORDER BY price_date DESC\r\n",
+        "        ) AS recency_rank\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned\r\n",
+        "\r\n",
+        "    WHERE adjusted_closing_price IS NOT NULL\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
@@ -435,104 +586,135 @@
         "\r\n",
         "    SELECT\r\n",
         "        p.time_horizon,\r\n",
-        "        l.latest_month,\r\n",
+        "        l.latest_date,\r\n",
         "\r\n",
         "        CASE p.time_horizon\r\n",
-        "            WHEN '1M'\r\n",
-        "                THEN l.latest_month\r\n",
+        "            WHEN '1M' THEN ADD_MONTHS(l.latest_date, -1)\r\n",
+        "            WHEN '3M' THEN ADD_MONTHS(l.latest_date, -3)\r\n",
+        "            WHEN '6M' THEN ADD_MONTHS(l.latest_date, -6)\r\n",
         "\r\n",
-        "            WHEN '3M'\r\n",
-        "                THEN ADD_MONTHS(l.latest_month, -2)\r\n",
+        "            WHEN 'YTD' THEN CAST(\r\n",
+        "                DATE_TRUNC('YEAR', l.latest_date)\r\n",
+        "                AS DATE\r\n",
+        "            )\r\n",
         "\r\n",
-        "            WHEN '6M'\r\n",
-        "                THEN ADD_MONTHS(l.latest_month, -5)\r\n",
-        "\r\n",
-        "            WHEN 'YTD'\r\n",
-        "                THEN CAST(\r\n",
-        "                    DATE_TRUNC('YEAR', l.latest_month)\r\n",
-        "                    AS DATE\r\n",
-        "                )\r\n",
-        "\r\n",
-        "            WHEN '1Y'\r\n",
-        "                THEN ADD_MONTHS(l.latest_month, -11)\r\n",
-        "\r\n",
-        "            WHEN '3Y'\r\n",
-        "                THEN ADD_MONTHS(l.latest_month, -35)\r\n",
-        "\r\n",
-        "            WHEN '5Y'\r\n",
-        "                THEN ADD_MONTHS(l.latest_month, -59)\r\n",
-        "\r\n",
-        "            WHEN 'MAX'\r\n",
-        "                THEN DATE '1900-01-01'\r\n",
-        "        END AS required_start_month,\r\n",
-        "\r\n",
-        "        CASE p.time_horizon\r\n",
-        "            WHEN '1M' THEN 1\r\n",
-        "            WHEN '3M' THEN 3\r\n",
-        "            WHEN '6M' THEN 6\r\n",
-        "            WHEN 'YTD' THEN MONTH(l.latest_month)\r\n",
-        "            WHEN '1Y' THEN 12\r\n",
-        "            WHEN '3Y' THEN 36\r\n",
-        "            WHEN '5Y' THEN 60\r\n",
-        "            WHEN 'MAX' THEN NULL\r\n",
-        "        END AS expected_months\r\n",
+        "            WHEN '1Y' THEN ADD_MONTHS(l.latest_date, -12)\r\n",
+        "            WHEN '3Y' THEN ADD_MONTHS(l.latest_date, -36)\r\n",
+        "            WHEN '5Y' THEN ADD_MONTHS(l.latest_date, -60)\r\n",
+        "            WHEN 'MAX' THEN DATE '1900-01-01'\r\n",
+        "        END AS period_start_date\r\n",
         "\r\n",
         "    FROM parameter_value p\r\n",
-        "    CROSS JOIN latest_completed_month l\r\n",
+        "\r\n",
+        "    CROSS JOIN latest_market_date l\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
-        "selected_monthly_returns AS (\r\n",
+        "selected_prices AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        p.symbol,\r\n",
-        "        p.month_start_date,\r\n",
-        "        p.monthly_return_pct,\r\n",
-        "        c.time_horizon,\r\n",
-        "        c.latest_month,\r\n",
-        "        c.expected_months\r\n",
+        "        d.symbol,\r\n",
+        "        d.price_date,\r\n",
+        "        d.adjusted_closing_price,\r\n",
+        "        c.time_horizon\r\n",
         "\r\n",
-        "    FROM gold.etf_month_by_month_performance p\r\n",
+        "    FROM ranked_daily_prices d\r\n",
+        "\r\n",
         "    CROSS JOIN period_configuration c\r\n",
         "\r\n",
-        "    WHERE p.month_start_date\r\n",
-        "              BETWEEN c.required_start_month\r\n",
-        "                  AND c.latest_month\r\n",
+        "    WHERE d.price_date <= c.latest_date\r\n",
         "\r\n",
-        "      AND p.monthly_return_pct IS NOT NULL\r\n",
+        "      AND (\r\n",
+        "            (\r\n",
+        "                c.time_horizon = '1D'\r\n",
+        "                AND d.recency_rank <= 2\r\n",
+        "            )\r\n",
+        "\r\n",
+        "            OR\r\n",
+        "\r\n",
+        "            (\r\n",
+        "                c.time_horizon = '1W'\r\n",
+        "                AND d.recency_rank <= 6\r\n",
+        "            )\r\n",
+        "\r\n",
+        "            OR\r\n",
+        "\r\n",
+        "            (\r\n",
+        "                c.time_horizon NOT IN ('1D', '1W')\r\n",
+        "                AND d.price_date >= c.period_start_date\r\n",
+        "            )\r\n",
+        "      )\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
-        "compounded_performance AS (\r\n",
+        "performance_window AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
         "        symbol,\r\n",
         "        time_horizon,\r\n",
         "\r\n",
-        "        MIN(month_start_date) AS period_start_month,\r\n",
-        "        MAX(month_start_date) AS period_end_month,\r\n",
+        "        FIRST_VALUE(price_date) OVER (\r\n",
+        "            PARTITION BY symbol, time_horizon\r\n",
+        "            ORDER BY price_date\r\n",
+        "            ROWS BETWEEN UNBOUNDED PRECEDING\r\n",
+        "                     AND UNBOUNDED FOLLOWING\r\n",
+        "        ) AS period_start_month,\r\n",
         "\r\n",
-        "        COUNT(*) AS months_available,\r\n",
-        "        MAX(expected_months) AS expected_months,\r\n",
+        "        LAST_VALUE(price_date) OVER (\r\n",
+        "            PARTITION BY symbol, time_horizon\r\n",
+        "            ORDER BY price_date\r\n",
+        "            ROWS BETWEEN UNBOUNDED PRECEDING\r\n",
+        "                     AND UNBOUNDED FOLLOWING\r\n",
+        "        ) AS period_end_month,\r\n",
+        "\r\n",
+        "        FIRST_VALUE(adjusted_closing_price) OVER (\r\n",
+        "            PARTITION BY symbol, time_horizon\r\n",
+        "            ORDER BY price_date\r\n",
+        "            ROWS BETWEEN UNBOUNDED PRECEDING\r\n",
+        "                     AND UNBOUNDED FOLLOWING\r\n",
+        "        ) AS starting_price,\r\n",
+        "\r\n",
+        "        LAST_VALUE(adjusted_closing_price) OVER (\r\n",
+        "            PARTITION BY symbol, time_horizon\r\n",
+        "            ORDER BY price_date\r\n",
+        "            ROWS BETWEEN UNBOUNDED PRECEDING\r\n",
+        "                     AND UNBOUNDED FOLLOWING\r\n",
+        "        ) AS ending_price,\r\n",
+        "\r\n",
+        "        COUNT(*) OVER (\r\n",
+        "            PARTITION BY symbol, time_horizon\r\n",
+        "        ) AS price_observations,\r\n",
+        "\r\n",
+        "        ROW_NUMBER() OVER (\r\n",
+        "            PARTITION BY symbol, time_horizon\r\n",
+        "            ORDER BY price_date DESC\r\n",
+        "        ) AS final_row_number\r\n",
+        "\r\n",
+        "    FROM selected_prices\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "period_performance AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        time_horizon,\r\n",
+        "        period_start_month,\r\n",
+        "        period_end_month,\r\n",
+        "        price_observations,\r\n",
         "\r\n",
         "        ROUND(\r\n",
         "            100 * (\r\n",
-        "                EXP(\r\n",
-        "                    SUM(\r\n",
-        "                        LN(\r\n",
-        "                            1 + monthly_return_pct / 100.0\r\n",
-        "                        )\r\n",
-        "                    )\r\n",
-        "                ) - 1\r\n",
+        "                ending_price\r\n",
+        "                / NULLIF(starting_price, 0)\r\n",
+        "                - 1\r\n",
         "            ),\r\n",
         "            2\r\n",
         "        ) AS period_return_pct\r\n",
         "\r\n",
-        "    FROM selected_monthly_returns\r\n",
+        "    FROM performance_window\r\n",
         "\r\n",
-        "    GROUP BY\r\n",
-        "        symbol,\r\n",
-        "        time_horizon\r\n",
+        "    WHERE final_row_number = 1\r\n",
         "\r\n",
         ")\r\n",
         "\r\n",
@@ -546,8 +728,34 @@
         "    p.time_horizon,\r\n",
         "    p.period_start_month,\r\n",
         "    p.period_end_month,\r\n",
-        "    p.months_available,\r\n",
         "\r\n",
+        "    CASE p.time_horizon\r\n",
+        "        WHEN '1D' THEN 1\r\n",
+        "        WHEN '1W' THEN 5\r\n",
+        "        WHEN '1M' THEN 1\r\n",
+        "        WHEN '3M' THEN 3\r\n",
+        "        WHEN '6M' THEN 6\r\n",
+        "        WHEN 'YTD' THEN MONTH(p.period_end_month)\r\n",
+        "        WHEN '1Y' THEN 12\r\n",
+        "        WHEN '3Y' THEN 36\r\n",
+        "        WHEN '5Y' THEN 60\r\n",
+        "        WHEN 'MAX' THEN NULL\r\n",
+        "    END AS months_available,\r\n",
+        "\r\n",
+        "    CASE p.time_horizon\r\n",
+        "        WHEN '1D' THEN 1\r\n",
+        "        WHEN '1W' THEN 5\r\n",
+        "        WHEN '1M' THEN 1\r\n",
+        "        WHEN '3M' THEN 3\r\n",
+        "        WHEN '6M' THEN 6\r\n",
+        "        WHEN 'YTD' THEN MONTH(p.period_end_month)\r\n",
+        "        WHEN '1Y' THEN 12\r\n",
+        "        WHEN '3Y' THEN 36\r\n",
+        "        WHEN '5Y' THEN 60\r\n",
+        "        WHEN 'MAX' THEN NULL\r\n",
+        "    END AS expected_months,\r\n",
+        "\r\n",
+        "    p.price_observations,\r\n",
         "    p.period_return_pct,\r\n",
         "\r\n",
         "    CASE\r\n",
@@ -555,13 +763,10 @@
         "        ELSE 'Negative'\r\n",
         "    END AS return_direction\r\n",
         "\r\n",
-        "FROM compounded_performance p\r\n",
+        "FROM period_performance p\r\n",
         "\r\n",
         "LEFT JOIN reference.etf_metadata m\r\n",
         "    ON p.symbol = m.symbol\r\n",
-        "\r\n",
-        "WHERE p.time_horizon = 'MAX'\r\n",
-        "   OR p.months_available = p.expected_months\r\n",
         "\r\n",
         "ORDER BY\r\n",
         "    p.period_return_pct DESC,\r\n",
@@ -597,12 +802,32 @@
         "\r\n",
         "),\r\n",
         "\r\n",
-        "latest_completed_month AS (\r\n",
+        "latest_market_date AS (\r\n",
         "\r\n",
-        "    SELECT MAX(month_start_date) AS latest_month\r\n",
-        "    FROM gold.etf_month_by_month_performance\r\n",
-        "    WHERE month_start_date <\r\n",
-        "          CAST(DATE_TRUNC('MONTH', CURRENT_DATE()) AS DATE)\r\n",
+        "    SELECT\r\n",
+        "        MAX(price_date) AS latest_date\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned\r\n",
+        "\r\n",
+        "    WHERE adjusted_closing_price IS NOT NULL\r\n",
+        "\r\n",
+        "),\r\n",
+        "\r\n",
+        "ranked_daily_prices AS (\r\n",
+        "\r\n",
+        "    SELECT\r\n",
+        "        symbol,\r\n",
+        "        price_date,\r\n",
+        "        adjusted_closing_price,\r\n",
+        "\r\n",
+        "        ROW_NUMBER() OVER (\r\n",
+        "            PARTITION BY symbol\r\n",
+        "            ORDER BY price_date DESC\r\n",
+        "        ) AS recency_rank\r\n",
+        "\r\n",
+        "    FROM silver.etf_prices_cleaned\r\n",
+        "\r\n",
+        "    WHERE adjusted_closing_price IS NOT NULL\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
@@ -610,103 +835,124 @@
         "\r\n",
         "    SELECT\r\n",
         "        p.time_horizon,\r\n",
-        "        l.latest_month,\r\n",
+        "        l.latest_date,\r\n",
         "\r\n",
         "        CASE p.time_horizon\r\n",
-        "            WHEN '1M'  THEN l.latest_month\r\n",
-        "            WHEN '3M'  THEN ADD_MONTHS(l.latest_month, -2)\r\n",
-        "            WHEN '6M'  THEN ADD_MONTHS(l.latest_month, -5)\r\n",
-        "            WHEN 'YTD' THEN CAST(DATE_TRUNC('YEAR', l.latest_month) AS DATE)\r\n",
-        "            WHEN '1Y'  THEN ADD_MONTHS(l.latest_month, -11)\r\n",
-        "            WHEN '3Y'  THEN ADD_MONTHS(l.latest_month, -35)\r\n",
-        "            WHEN '5Y'  THEN ADD_MONTHS(l.latest_month, -59)\r\n",
-        "            WHEN 'MAX' THEN DATE '1900-01-01'\r\n",
-        "        END AS return_start_month\r\n",
+        "            WHEN '1M'\r\n",
+        "                THEN ADD_MONTHS(l.latest_date, -1)\r\n",
+        "\r\n",
+        "            WHEN '3M'\r\n",
+        "                THEN ADD_MONTHS(l.latest_date, -3)\r\n",
+        "\r\n",
+        "            WHEN '6M'\r\n",
+        "                THEN ADD_MONTHS(l.latest_date, -6)\r\n",
+        "\r\n",
+        "            WHEN 'YTD'\r\n",
+        "                THEN CAST(\r\n",
+        "                    DATE_TRUNC('YEAR', l.latest_date)\r\n",
+        "                    AS DATE\r\n",
+        "                )\r\n",
+        "\r\n",
+        "            WHEN '1Y'\r\n",
+        "                THEN ADD_MONTHS(l.latest_date, -12)\r\n",
+        "\r\n",
+        "            WHEN '3Y'\r\n",
+        "                THEN ADD_MONTHS(l.latest_date, -36)\r\n",
+        "\r\n",
+        "            WHEN '5Y'\r\n",
+        "                THEN ADD_MONTHS(l.latest_date, -60)\r\n",
+        "\r\n",
+        "            WHEN 'MAX'\r\n",
+        "                THEN DATE '1900-01-01'\r\n",
+        "        END AS period_start_date\r\n",
         "\r\n",
         "    FROM parameter_value p\r\n",
-        "    CROSS JOIN latest_completed_month l\r\n",
+        "\r\n",
+        "    CROSS JOIN latest_market_date l\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
-        "selected_returns AS (\r\n",
+        "selected_prices AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
-        "        p.symbol,\r\n",
-        "        p.month_start_date,\r\n",
-        "        p.monthly_return_pct,\r\n",
+        "        d.symbol,\r\n",
+        "        d.price_date,\r\n",
+        "        d.adjusted_closing_price,\r\n",
         "        c.time_horizon\r\n",
         "\r\n",
-        "    FROM gold.etf_month_by_month_performance p\r\n",
+        "    FROM ranked_daily_prices d\r\n",
+        "\r\n",
         "    CROSS JOIN period_configuration c\r\n",
         "\r\n",
-        "    WHERE p.month_start_date\r\n",
-        "          BETWEEN c.return_start_month AND c.latest_month\r\n",
+        "    WHERE d.price_date <= c.latest_date\r\n",
         "\r\n",
-        "      AND p.monthly_return_pct IS NOT NULL\r\n",
+        "      AND (\r\n",
+        "            (\r\n",
+        "                c.time_horizon = '1D'\r\n",
+        "                AND d.recency_rank <= 2\r\n",
+        "            )\r\n",
+        "\r\n",
+        "            OR\r\n",
+        "\r\n",
+        "            (\r\n",
+        "                c.time_horizon = '1W'\r\n",
+        "                AND d.recency_rank <= 6\r\n",
+        "            )\r\n",
+        "\r\n",
+        "            OR\r\n",
+        "\r\n",
+        "            (\r\n",
+        "                c.time_horizon NOT IN ('1D', '1W')\r\n",
+        "                AND d.price_date >= c.period_start_date\r\n",
+        "            )\r\n",
+        "      )\r\n",
         "\r\n",
         "),\r\n",
         "\r\n",
-        "cumulative_growth AS (\r\n",
+        "normalized_prices AS (\r\n",
         "\r\n",
         "    SELECT\r\n",
         "        symbol,\r\n",
-        "        month_start_date,\r\n",
+        "        price_date,\r\n",
         "        time_horizon,\r\n",
         "\r\n",
         "        ROUND(\r\n",
-        "            100 * EXP(\r\n",
-        "                SUM(\r\n",
-        "                    LN(1 + monthly_return_pct / 100.0)\r\n",
-        "                ) OVER (\r\n",
+        "            100.0\r\n",
+        "            * adjusted_closing_price\r\n",
+        "            / NULLIF(\r\n",
+        "                FIRST_VALUE(adjusted_closing_price) OVER (\r\n",
         "                    PARTITION BY symbol\r\n",
-        "                    ORDER BY month_start_date\r\n",
-        "                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\r\n",
-        "                )\r\n",
+        "                    ORDER BY price_date\r\n",
+        "                    ROWS BETWEEN UNBOUNDED PRECEDING\r\n",
+        "                             AND UNBOUNDED FOLLOWING\r\n",
+        "                ),\r\n",
+        "                0\r\n",
         "            ),\r\n",
         "            2\r\n",
         "        ) AS normalized_value\r\n",
         "\r\n",
-        "    FROM selected_returns\r\n",
-        "\r\n",
-        "),\r\n",
-        "\r\n",
-        "starting_points AS (\r\n",
-        "\r\n",
-        "    SELECT\r\n",
-        "        symbol,\r\n",
-        "        ADD_MONTHS(MIN(month_start_date), -1) AS month_start_date,\r\n",
-        "        MAX(time_horizon) AS time_horizon,\r\n",
-        "        100.00 AS normalized_value\r\n",
-        "\r\n",
-        "    FROM selected_returns\r\n",
-        "\r\n",
-        "    GROUP BY symbol\r\n",
-        "\r\n",
-        "),\r\n",
-        "\r\n",
-        "combined AS (\r\n",
-        "\r\n",
-        "    SELECT * FROM starting_points\r\n",
-        "    UNION ALL\r\n",
-        "    SELECT * FROM cumulative_growth\r\n",
+        "    FROM selected_prices\r\n",
         "\r\n",
         ")\r\n",
         "\r\n",
         "SELECT\r\n",
-        "    c.symbol,\r\n",
-        "    COALESCE(m.etf_name, c.symbol) AS etf_name,\r\n",
-        "    c.month_start_date,\r\n",
-        "    c.time_horizon,\r\n",
-        "    c.normalized_value\r\n",
+        "    n.symbol,\r\n",
+        "    COALESCE(m.etf_name, n.symbol) AS etf_name,\r\n",
         "\r\n",
-        "FROM combined c\r\n",
+        "    -- Existing name retained so the chart configuration does not break\r\n",
+        "    n.price_date AS month_start_date,\r\n",
+        "\r\n",
+        "    n.time_horizon,\r\n",
+        "    n.normalized_value\r\n",
+        "\r\n",
+        "FROM normalized_prices n\r\n",
         "\r\n",
         "LEFT JOIN reference.etf_metadata m\r\n",
-        "    ON c.symbol = m.symbol\r\n",
+        "    ON n.symbol = m.symbol\r\n",
         "\r\n",
         "ORDER BY\r\n",
-        "    c.symbol,\r\n",
-        "    c.month_start_date;"
+        "    n.symbol,\r\n",
+        "    n.price_date;"
       ],
       "parameters": [
         {
@@ -904,11 +1150,11 @@
                   "datasetName": "8386a00d",
                   "fields": [
                     {
-                      "name": "avg(avg_monthly_return_pct)",
-                      "expression": "AVG(`avg_monthly_return_pct`)"
+                      "name": "avg_30d_return_pct",
+                      "expression": "`avg_30d_return_pct`"
                     }
                   ],
-                  "disaggregated": false
+                  "disaggregated": true
                 }
               }
             ],
@@ -916,62 +1162,14 @@
               "version": 2,
               "frame": {
                 "showTitle": true,
-                "title": "Market Average Return",
+                "title": "Average 30-Day Return",
                 "headerAlignment": "center"
               },
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "avg(avg_monthly_return_pct)",
-                  "formatTemplate": "{{ @formatted }}%",
-                  "format": {
-                    "type": "number-plain",
-                    "abbreviation": "compact",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 2
-                    }
-                  },
-                  "style": {
-                    "rules": [
-                      {
-                        "condition": {
-                          "operand": {
-                            "type": "data-value",
-                            "value": "0"
-                          },
-                          "operator": ">="
-                        },
-                        "color": "#00A972"
-                      },
-                      {
-                        "condition": {
-                          "operand": {
-                            "type": "data-value",
-                            "value": "0"
-                          },
-                          "operator": "="
-                        },
-                        "color": {
-                          "themeColorType": "visualizationColors",
-                          "position": 2
-                        }
-                      },
-                      {
-                        "condition": {
-                          "operand": {
-                            "type": "data-value",
-                            "value": "0"
-                          },
-                          "operator": "<"
-                        },
-                        "color": {
-                          "themeColorType": "visualizationColors",
-                          "position": 4
-                        }
-                      }
-                    ]
-                  }
+                  "fieldName": "avg_30d_return_pct",
+                  "formatTemplate": "{{ @formatted }}%"
                 }
               },
               "data": {
@@ -980,9 +1178,9 @@
             }
           },
           "position": {
-            "x": 1,
+            "x": 3,
             "y": 1,
-            "width": 4,
+            "width": 2,
             "height": 2
           }
         },
@@ -996,11 +1194,11 @@
                   "datasetName": "8386a00d",
                   "fields": [
                     {
-                      "name": "max(positive_etf_ratio_pct)",
-                      "expression": "MAX(`positive_etf_ratio_pct`)"
+                      "name": "positive_etf_ratio_pct",
+                      "expression": "`positive_etf_ratio_pct`"
                     }
                   ],
-                  "disaggregated": false
+                  "disaggregated": true
                 }
               }
             ],
@@ -1014,16 +1212,8 @@
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "max(positive_etf_ratio_pct)",
+                  "fieldName": "positive_etf_ratio_pct",
                   "formatTemplate": "{{ @formatted }}%",
-                  "format": {
-                    "type": "number-plain",
-                    "abbreviation": "compact",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 2
-                    }
-                  },
                   "style": {
                     "rules": [
                       {
@@ -1087,7 +1277,7 @@
           "position": {
             "x": 7,
             "y": 1,
-            "width": 4,
+            "width": 2,
             "height": 2
           }
         },
@@ -1101,20 +1291,8 @@
                   "datasetName": "8386a00d",
                   "fields": [
                     {
-                      "name": "header_display_value",
-                      "expression": "`header_display_value`"
-                    },
-                    {
-                      "name": "reporting_month_label",
-                      "expression": "`reporting_month_label`"
-                    },
-                    {
-                      "name": "latest_price_date_label",
-                      "expression": "`latest_price_date_label`"
-                    },
-                    {
-                      "name": "etfs_tracked",
-                      "expression": "`etfs_tracked`"
+                      "name": "overview_header_label",
+                      "expression": "`overview_header_label`"
                     }
                   ],
                   "disaggregated": true
@@ -1129,18 +1307,7 @@
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "header_display_value",
-                  "style": {
-                    "rules": [
-                      {
-                        "condition": {
-                          "operator": "="
-                        },
-                        "color": "#00A972"
-                      }
-                    ]
-                  },
-                  "formatTemplate": "Latest completed month: {{ reporting_month_label }} | Daily prices updated through: {{ latest_price_date_label }} | {{ etfs_tracked }} ETFs tracked"
+                  "fieldName": "overview_header_label"
                 }
               },
               "data": {
@@ -1165,15 +1332,11 @@
                   "datasetName": "8386a00d",
                   "fields": [
                     {
-                      "name": "max(best_return_pct)",
-                      "expression": "MAX(`best_return_pct`)"
-                    },
-                    {
-                      "name": "best_symbol",
-                      "expression": "`best_symbol`"
+                      "name": "best_performer_label",
+                      "expression": "`best_performer_label`"
                     }
                   ],
-                  "disaggregated": false
+                  "disaggregated": true
                 }
               }
             ],
@@ -1181,7 +1344,7 @@
               "version": 2,
               "frame": {
                 "showTitle": true,
-                "title": "Best Performer",
+                "title": "Best Performer — 30D",
                 "headerAlignment": "center",
                 "showDescription": false,
                 "description": "{{ best_etf_name }}"
@@ -1189,30 +1352,8 @@
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "max(best_return_pct)",
-                  "style": {
-                    "rules": [
-                      {
-                        "condition": {
-                          "operand": {
-                            "type": "data-value",
-                            "value": "0"
-                          },
-                          "operator": ">="
-                        },
-                        "color": "#00A972"
-                      }
-                    ]
-                  },
-                  "formatTemplate": "{{ best_symbol }} | {{ @formatted }}%",
-                  "format": {
-                    "type": "number-plain",
-                    "abbreviation": "compact",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 2
-                    }
-                  }
+                  "fieldName": "best_performer_label",
+                  "formatTemplate": "{{ @formatted }}"
                 }
               },
               "data": {
@@ -1221,9 +1362,9 @@
             }
           },
           "position": {
-            "x": 1,
+            "x": 0,
             "y": 3,
-            "width": 4,
+            "width": 5,
             "height": 2
           }
         },
@@ -1237,15 +1378,11 @@
                   "datasetName": "8386a00d",
                   "fields": [
                     {
-                      "name": "max(worst_return_pct)",
-                      "expression": "MAX(`worst_return_pct`)"
-                    },
-                    {
-                      "name": "worst_symbol",
-                      "expression": "`worst_symbol`"
+                      "name": "worst_performer_label",
+                      "expression": "`worst_performer_label`"
                     }
                   ],
-                  "disaggregated": false
+                  "disaggregated": true
                 }
               }
             ],
@@ -1253,7 +1390,7 @@
               "version": 2,
               "frame": {
                 "showTitle": true,
-                "title": "Worst Performer",
+                "title": "Worst Performer — 30D",
                 "headerAlignment": "center",
                 "showDescription": false,
                 "description": "{{ best_etf_name }}"
@@ -1261,33 +1398,7 @@
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "max(worst_return_pct)",
-                  "style": {
-                    "rules": [
-                      {
-                        "condition": {
-                          "operand": {
-                            "type": "data-value",
-                            "value": "0"
-                          },
-                          "operator": "<"
-                        },
-                        "color": {
-                          "themeColorType": "visualizationColors",
-                          "position": 4
-                        }
-                      }
-                    ]
-                  },
-                  "formatTemplate": "{{ worst_symbol }} | {{ @formatted }}%",
-                  "format": {
-                    "type": "number-plain",
-                    "abbreviation": "compact",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 2
-                    }
-                  }
+                  "fieldName": "worst_performer_label"
                 }
               },
               "data": {
@@ -1298,7 +1409,7 @@
           "position": {
             "x": 7,
             "y": 3,
-            "width": 4,
+            "width": 5,
             "height": 2
           }
         },
@@ -1312,8 +1423,8 @@
                   "datasetName": "0d5d8b46",
                   "fields": [
                     {
-                      "name": "sum(monthly_return_pct)",
-                      "expression": "SUM(`monthly_return_pct`)"
+                      "name": "sum(return_30d_pct)",
+                      "expression": "SUM(`return_30d_pct`)"
                     },
                     {
                       "name": "etf_name",
@@ -1328,8 +1439,16 @@
                       "expression": "`region`"
                     },
                     {
-                      "name": "max(monthly_return_pct)",
-                      "expression": "MAX(`monthly_return_pct`)"
+                      "name": "daily(start_date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `start_date`)"
+                    },
+                    {
+                      "name": "daily(end_date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `end_date`)"
+                    },
+                    {
+                      "name": "max(return_30d_pct)",
+                      "expression": "MAX(`return_30d_pct`)"
                     },
                     {
                       "name": "symbol",
@@ -1344,15 +1463,15 @@
               "version": 3,
               "frame": {
                 "showTitle": true,
-                "title": "Latest Monthly ETF Returns",
+                "title": "ETF Returns — Previous 30 Days",
                 "headerAlignment": "center"
               },
               "widgetType": "bar",
               "encodings": {
                 "x": {
-                  "fieldName": "max(monthly_return_pct)",
+                  "fieldName": "max(return_30d_pct)",
                   "axis": {
-                    "title": "Monthly Return (%)",
+                    "title": "30-Day Return (%)",
                     "hideGrid": false,
                     "hideLabels": false
                   },
@@ -1378,34 +1497,12 @@
                   "scale": {
                     "type": "categorical",
                     "sort": {
-                      "by": "custom-order",
-                      "orderedValues": [
-                        "INDA",
-                        "EFA",
-                        "EWJ",
-                        "BNDX",
-                        "BND",
-                        "EWU",
-                        "VEA",
-                        "VXUS",
-                        "VT",
-                        "ACWI",
-                        "QQQ",
-                        "VWO",
-                        "VOO",
-                        "SPY",
-                        "IEMG",
-                        "EWZ",
-                        "EWG",
-                        "VGT",
-                        "MCHI",
-                        "GLD"
-                      ]
+                      "by": "x-reversed"
                     }
                   }
                 },
                 "color": {
-                  "fieldName": "sum(monthly_return_pct)",
+                  "fieldName": "sum(return_30d_pct)",
                   "legend": {
                     "hide": true
                   },
@@ -1429,6 +1526,12 @@
                   },
                   {
                     "fieldName": "region"
+                  },
+                  {
+                    "fieldName": "daily(start_date)"
+                  },
+                  {
+                    "fieldName": "daily(end_date)"
                   }
                 ]
               },
@@ -1449,7 +1552,7 @@
             "name": "0fb3959e",
             "multilineTextboxSpec": {
               "lines": [
-                "<span style=\"text-align:center;display:block\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
+                "<span style=\"text-align:center;display:block\"><span style=\"color:#919191\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Data updated through the latest available trading day · For educational and analytical purposes only—not investment advice.</span></span>"
               ]
             }
           },
@@ -1484,6 +1587,10 @@
                     {
                       "name": "time_horizon_associativity",
                       "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    },
+                    {
+                      "name": "sum(sort_order)",
+                      "expression": "SUM(`sort_order`)"
                     }
                   ],
                   "disaggregated": false
@@ -1521,6 +1628,16 @@
               "frame": {
                 "showTitle": true,
                 "title": "Time Horizon"
+              },
+              "scale": {
+                "type": "categorical",
+                "sort": {
+                  "by": "measure",
+                  "measure": {
+                    "fieldName": "sum(sort_order)",
+                    "queryName": "dashboards/01f18ad123ef16729a7a8d84a7e3b821/datasets/01f18b6c5ed010de9a20f233dddc49e5_time_horizon"
+                  }
+                }
               },
               "widgetType": "filter-single-select",
               "encodings": {
@@ -1566,20 +1683,16 @@
                       "expression": "`etf_name`"
                     },
                     {
-                      "name": "monthly(period_start_month)",
-                      "expression": "DATE_TRUNC(\"MONTH\", `period_start_month`)"
+                      "name": "daily(period_start_month)",
+                      "expression": "DATE_TRUNC(\"DAY\", `period_start_month`)"
                     },
                     {
-                      "name": "monthly(period_end_month)",
-                      "expression": "DATE_TRUNC(\"MONTH\", `period_end_month`)"
+                      "name": "daily(period_end_month)",
+                      "expression": "DATE_TRUNC(\"DAY\", `period_end_month`)"
                     },
                     {
                       "name": "time_horizon",
                       "expression": "`time_horizon`"
-                    },
-                    {
-                      "name": "months_available",
-                      "expression": "`months_available`"
                     },
                     {
                       "name": "max(period_return_pct)",
@@ -1647,16 +1760,13 @@
                     "fieldName": "etf_name"
                   },
                   {
-                    "fieldName": "monthly(period_start_month)"
+                    "fieldName": "daily(period_start_month)"
                   },
                   {
-                    "fieldName": "monthly(period_end_month)"
+                    "fieldName": "daily(period_end_month)"
                   },
                   {
                     "fieldName": "time_horizon"
-                  },
-                  {
-                    "fieldName": "months_available"
                   }
                 ]
               },
@@ -1694,8 +1804,8 @@
                       "expression": "`time_horizon`"
                     },
                     {
-                      "name": "monthly(month_start_date)",
-                      "expression": "DATE_TRUNC(\"MONTH\", `month_start_date`)"
+                      "name": "daily(month_start_date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `month_start_date`)"
                     },
                     {
                       "name": "max(normalized_value)",
@@ -1716,9 +1826,11 @@
               "widgetType": "line",
               "encodings": {
                 "x": {
-                  "fieldName": "monthly(month_start_date)",
+                  "fieldName": "daily(month_start_date)",
                   "axis": {
-                    "title": "Month"
+                    "title": "Date",
+                    "hideLabels": false,
+                    "hideTitle": false
                   },
                   "scale": {
                     "type": "temporal"
@@ -1835,10 +1947,10 @@
         },
         {
           "widget": {
-            "name": "5389acf5",
+            "name": "8f765fc0",
             "multilineTextboxSpec": {
               "lines": [
-                "<span style=\"text-align:center;display:block\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
+                "<span style=\"text-align:center;display:block\"><span style=\"color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Data updated through the latest available trading day · For educational and analytical purposes only—not investment advice.</span></span>"
               ]
             }
           },
@@ -2219,7 +2331,7 @@
             "name": "ae643bab",
             "multilineTextboxSpec": {
               "lines": [
-                "<span style=\"text-align:center;display:block\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
+                "<span style=\"text-align:center;display:block;\"><span style=\"font-size: 14px;color: #919191;\">Source: Yahoo Finance · Returns calculated using adjusted closing prices · Seasonality includes current month-to-date data · For educational and analytical purposes only—not investment advice.</span></span>"
               ]
             }
           },
