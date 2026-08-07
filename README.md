@@ -22,13 +22,13 @@ The ETF universe covers US equities, international and emerging markets, technol
 
 ## Project Snapshot
 
-Operational status as of **30 July 2026**:
+Operational status as of **07 Aug 2026**:
 
 | Metric | Value |
 | --- | ---: |
 | ETFs tracked | 20 |
 | Historical coverage | From 2015-01-02 |
-| Latest automated price date validated | 2026-07-30 |
+| Latest automated price date validated | 2026-08-07 |
 | Duplicate `(symbol, price_date)` keys | 0 |
 | dbt models | 6 |
 | dbt data tests | 82 |
